@@ -1,1 +1,1 @@
-# Default configuration for mips-linux-user
+# Default configuration for irix-linux-user
