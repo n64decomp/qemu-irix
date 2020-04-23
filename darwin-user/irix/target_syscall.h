@@ -1,6 +1,8 @@
 #ifndef IRIX_TARGET_SYSCALL_H
 #define IRIX_TARGET_SYSCALL_H
 
+#include "cpu.h"
+
 /* this struct defines the way the registers are stored on the
    stack during a system call. */
 
@@ -26,5 +28,31 @@ static inline abi_ulong target_shmlba(CPUMIPSState *env)
 {
     return 0x40000;
 }
+
+/* IRIX sys/types.h */
+typedef uint32_t target_ino_t;
+typedef abi_long target_off_t;
+
+/* IRIX sys/dirent.h */
+struct target_dirent {
+	target_ino_t d_ino;
+	target_off_t d_off;
+	abi_ushort d_reclen;
+	char d_name[1];
+};
+/* size of struct target_dirent without the name array */
+#define target_dirent_len (offsetof(struct target_dirent, d_name));
+
+/* IRIX sys/types.h */
+typedef uint64_t target_ino64_t;
+typedef uint64_t target_off64_t;
+
+/* IRIX sys/dirent.h */
+struct target_dirent64 {
+	target_ino64_t d_ino;
+	target_off64_t d_off;
+	abi_ushort d_reclen;
+	char d_name[1];
+};
 
 #endif

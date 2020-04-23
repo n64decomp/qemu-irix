@@ -500,7 +500,7 @@ static inline int access_ok(int type, abi_ulong addr, abi_ulong size)
      ((hptr), (x)), (void)0)
 
 #define __get_user_e(x, hptr, e)                                        \
-  ((x) = (typeof(*hptr))(                                               \
+  ((x) = (__typeof__(*(hptr)))(                                         \
    __builtin_choose_expr(sizeof(*(hptr)) == 1, ldub_p,                  \
    __builtin_choose_expr(sizeof(*(hptr)) == 2, lduw_##e##_p,            \
    __builtin_choose_expr(sizeof(*(hptr)) == 4, ldl_##e##_p,             \

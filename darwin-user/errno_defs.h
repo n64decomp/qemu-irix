@@ -9,7 +9,7 @@
 #define TARGET_ENOENT	2	/* No such file or directory		*/
 #define TARGET_ESRCH	3	/* No such process			*/
 #define TARGET_EINTR	4	/* Interrupted function call		*/
-#define TARGET_EIO	5	/* I/O error				*/
+#define TARGET_EIO		5	/* I/O error				*/
 #define TARGET_ENXIO	6	/* No such device or address		*/
 #define TARGET_E2BIG	7	/* Arg list too long			*/
 #define TARGET_ENOEXEC	8	/* Exec format error			*/
@@ -37,7 +37,7 @@
 #define TARGET_EROFS	30	/* Read only file system		*/
 #define TARGET_EMLINK	31	/* Too many links			*/
 #define TARGET_EPIPE	32	/* Broken pipe				*/
-#define TARGET_EDOM	33	/* Domain error				*/
+#define TARGET_EDOM		33	/* Domain error				*/
 #define TARGET_ERANGE	34	/* Result too large			*/
 #define TARGET_ENOMSG	35	/* No message of desired type		*/
 #define TARGET_EIDRM	36	/* Identifier removed			*/
@@ -46,7 +46,7 @@
 #define TARGET_EL3HLT	39	/* Level 3 halted			*/
 #define TARGET_EL3RST	40	/* Level 3 reset			*/
 #define TARGET_ELNRNG	41	/* Link number out of range		*/
-#define TARGET_EUNATCH 42	/* Protocol driver not attached		*/
+#define TARGET_EUNATCH 	42	/* Protocol driver not attached		*/
 #define TARGET_ENOCSI	43	/* No CSI structure available		*/
 #define TARGET_EL2HLT	44	/* Level 2 halted			*/
 #define TARGET_EDEADLK	45	/* Resource deadlock avoided		*/
@@ -74,7 +74,7 @@
 #define TARGET_ENOPKG	65	/* Package not installed                */
 #define TARGET_EREMOTE	66	/* The object is remote			*/
 #define TARGET_ENOLINK	67	/* the link has been severed */
-#define TARGET_EADV	68	/* advertise error */
+#define TARGET_EADV		68	/* advertise error */
 #define TARGET_ESRMNT	69	/* srmount error */
 
 #define TARGET_ECOMM	70	/* Communication error on send		*/
@@ -155,7 +155,7 @@
 #define TARGET_EREMDEV		142	/* Error 142 */
 #define TARGET_ECANCELED	158	/* AIO operation canceled */
 
-#else
+#else /* !(defined TARGET_ABI_IRIX || defined TARGET_ABI_SOLARIS) */
 #define TARGET_EPERM            1      /* Operation not permitted */
 #define TARGET_ENOENT           2      /* No such file or directory */
 #define TARGET_ESRCH            3      /* No such process */
@@ -294,7 +294,7 @@
 
 #define TARGET_ERFKILL         132     /* Operation not possible due to RF-kill */
 #define TARGET_EHWPOISON       133     /* Memory page has hardware error */
-#endif
+#endif /* defined TARGET_ABI_IRIX || defined TARGET_ABI_SOLARIS */
 
 /* QEMU internal, not visible to the guest. This is returned when a
  * system call should be restarted, to tell the main loop that it

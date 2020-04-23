@@ -72,33 +72,24 @@ const char *cpu_to_uname_machine(void *cpu_env)
 
 #define COPY_UTSNAME_FIELD(dest, src) \
   do { \
-      /* __NEW_UTS_LEN doesn't include terminating null */ \
-      (void) strncpy((dest), (src), __NEW_UTS_LEN); \
-      (dest)[__NEW_UTS_LEN] = '\0'; \
+      /* _SYS_NAMELEN does include terminating null */ \
+      (void) strncpy((dest), (src), _SYS_NAMELEN); \
   } while (0)
 
-int sys_uname(struct new_utsname *buf)
+int sys_uname(struct utsname *buf)
 {
   struct utsname uts_buf;
 
   if (uname(&uts_buf) < 0)
       return (-1);
 
-  /*
-   * Just in case these have some differences, we
-   * translate utsname to new_utsname (which is the
-   * struct linux kernel uses).
-   */
-
+  /* Just in case these have some differences */
   memset(buf, 0, sizeof(*buf));
   COPY_UTSNAME_FIELD(buf->sysname, uts_buf.sysname);
   COPY_UTSNAME_FIELD(buf->nodename, uts_buf.nodename);
   COPY_UTSNAME_FIELD(buf->release, uts_buf.release);
   COPY_UTSNAME_FIELD(buf->version, uts_buf.version);
   COPY_UTSNAME_FIELD(buf->machine, uts_buf.machine);
-#ifdef _GNU_SOURCE
-  COPY_UTSNAME_FIELD(buf->domainname, uts_buf.domainname);
-#endif
   return (0);
 
 #undef COPY_UTSNAME_FIELD

@@ -30,8 +30,9 @@ STRUCT(ifmap,
        /* Spare 3 bytes */
        TYPE_CHAR, TYPE_CHAR, TYPE_CHAR)
 
+/* Remove if structs for darwing */
 /* The *_ifreq_list arrays deal with the fact that struct ifreq has unions */
-
+/*
 STRUCT(sockaddr_ifreq,
        MK_ARRAY(TYPE_CHAR, IFNAMSIZ), MK_STRUCT(STRUCT_sockaddr))
 
@@ -53,13 +54,13 @@ STRUCT(ptr_ifreq,
 
 STRUCT(ifconf,
        TYPE_INT, TYPE_PTRVOID)
-
 STRUCT(arpreq,
        MK_STRUCT(STRUCT_sockaddr), MK_STRUCT(STRUCT_sockaddr), TYPE_INT, MK_STRUCT(STRUCT_sockaddr),
        MK_ARRAY(TYPE_CHAR, 16))
 
 STRUCT(arpreq_old,
        MK_STRUCT(STRUCT_sockaddr), MK_STRUCT(STRUCT_sockaddr), TYPE_INT, MK_STRUCT(STRUCT_sockaddr))
+*/
 
 STRUCT(cdrom_read_audio,
        TYPE_CHAR, TYPE_CHAR, TYPE_CHAR, TYPE_CHAR, TYPE_CHAR, TYPE_INT, TYPE_PTRVOID,
@@ -254,15 +255,16 @@ STRUCT(fiemap,
        TYPE_INT, /* fm_extent_count */
        TYPE_INT) /* fm_reserved */
 
-STRUCT(blkpg_partition,
-       TYPE_LONGLONG, /* start */
-       TYPE_LONGLONG, /* length */
-       TYPE_INT, /* pno */
-       MK_ARRAY(TYPE_CHAR, BLKPG_DEVNAMELTH), /* devname */
-       MK_ARRAY(TYPE_CHAR, BLKPG_VOLNAMELTH)) /* volname */
+// Removed; not needed for Irix
+// STRUCT(blkpg_partition,
+//        TYPE_LONGLONG, /* start */
+//        TYPE_LONGLONG, /* length */
+//        TYPE_INT, /* pno */
+//        MK_ARRAY(TYPE_CHAR, BLKPG_DEVNAMELTH), /* devname */
+//        MK_ARRAY(TYPE_CHAR, BLKPG_VOLNAMELTH)) /* volname */
 
-STRUCT(blkpg_ioctl_arg,
-       TYPE_INT, /* op */
-       TYPE_INT, /* flags */
-       TYPE_INT, /* datalen */
-       TYPE_PTRVOID) /* data */
+// STRUCT(blkpg_ioctl_arg,
+//        TYPE_INT, /* op */
+//        TYPE_INT, /* flags */
+//        TYPE_INT, /* datalen */
+//        TYPE_PTRVOID) /* data */

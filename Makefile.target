@@ -134,8 +134,9 @@ endif #CONFIG_BSD_USER
 
 ifdef CONFIG_DARWIN_USER
 
-QEMU_CFLAGS+=-I$(SRC_PATH)/darwin-user -I$(SRC_PATH)/darwin-user/$(TARGET_ABI_DIR) \
-			 -I$(SRC_PATH)/darwin-user/$(HOST_VARIANT_DIR)
+QEMU_CFLAGS+=-I$(SRC_PATH)/darwin-user/$(TARGET_ABI_DIR) \
+             -I$(SRC_PATH)/darwin-user/host/$(ARCH) \
+             -I$(SRC_PATH)/darwin-user
 
 obj-y += darwin-user/
 obj-y += gdbstub.o

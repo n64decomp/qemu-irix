@@ -430,7 +430,8 @@ static void page_init(void)
 #else
         FILE *f;
 
-        last_brk = (unsigned long)sbrk(0);
+        // depreciated in osx, but value is not used?
+        //last_brk = (unsigned long)sbrk(0);
 
         f = fopen("/compat/linux/proc/self/maps", "r");
         if (f) {

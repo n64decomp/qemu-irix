@@ -14,6 +14,13 @@ struct target_termios {
     unsigned char c_cc[TARGET_NCCS];                /* control characters */
 };
 
+struct target_winsize {
+	abi_ushort ws_row;      /* rows, in characters*/
+	abi_ushort ws_col;      /* columns, in character */
+	abi_ushort ws_xpixel;   /* horizontal size, pixels */
+	abi_ushort ws_ypixel;   /* vertical size, pixels */
+};
+
 /* c_iflag bits */
 #define TARGET_IGNBRK  0000001
 #define TARGET_BRKINT  0000002
@@ -199,8 +206,8 @@ struct target_termios {
 #define	 TARGET_TIOCPKT_NOSTOP		0x10	/* no more ^S, ^Q */
 #define	 TARGET_TIOCPKT_DOSTOP		0x20	/* now do ^S ^Q */
 /* #define  TIOCPKT_IOCTL		0x40	state change of pty driver */
-#define TARGET_TIOCSWINSZ	TARGET_IOW('t', 103, struct winsize)	/* set window size */
-#define TARGET_TIOCGWINSZ	TARGET_IOR('t', 104, struct winsize)	/* get window size */
+#define TARGET_TIOCSWINSZ	TARGET_IOW('t', 103, struct target_winsize)	/* set window size */
+#define TARGET_TIOCGWINSZ	TARGET_IOR('t', 104, struct target_winsize)	/* get window size */
 #define TARGET_TIOCNOTTY	0x5471		/* void tty association */
 #define TARGET_TIOCSETD	0x7401
 #define TARGET_TIOCGETD	0x7400

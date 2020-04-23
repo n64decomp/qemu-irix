@@ -32,18 +32,18 @@
 #define TARGET_SYS_RECVMMSG     19        /* recvmmsg()            */
 #define TARGET_SYS_SENDMMSG     20        /* sendmmsg()            */
 
-#define IPCOP_semop		1
-#define IPCOP_semget		2
-#define IPCOP_semctl		3
-#define IPCOP_semtimedop	4
-#define IPCOP_msgsnd		11
-#define IPCOP_msgrcv		12
-#define IPCOP_msgget		13
-#define IPCOP_msgctl		14
-#define IPCOP_shmat		21
-#define IPCOP_shmdt		22
-#define IPCOP_shmget		23
-#define IPCOP_shmctl		24
+#define IPCOP_semop             1
+#define IPCOP_semget            2
+#define IPCOP_semctl            3
+#define IPCOP_semtimedop        4
+#define IPCOP_msgsnd            11
+#define IPCOP_msgrcv            12
+#define IPCOP_msgget            13
+#define IPCOP_msgctl            14
+#define IPCOP_shmat             21
+#define IPCOP_shmdt             22
+#define IPCOP_shmget            23
+#define IPCOP_shmctl            24
 
 /*
  * The following is for compatibility across the various Linux
@@ -387,23 +387,6 @@ struct kernel_statfs {
         kernel_fsid_t f_fsid;
 	int f_namelen;
 	int f_spare[6];
-};
-
-struct target_dirent {
-        abi_long        d_ino;
-        abi_long        d_off;
-        unsigned short  d_reclen;
-        char            d_name[];
-};
-
-struct target_dirent64 {
-	uint64_t	d_ino;
-	int64_t		d_off;
-	unsigned short	d_reclen;
-#if !defined TARGET_ABI_IRIX && !defined TARGET_ABI_SOLARIS
-	unsigned char	d_type;
-#endif
-	char		d_name[256];
 };
 
 
@@ -1004,54 +987,56 @@ struct target_rlimit {
         abi_ulong   rlim_max;
 };
 
-#if defined(TARGET_ALPHA)
-#define TARGET_RLIM_INFINITY	0x7fffffffffffffffull
-#elif defined(TARGET_MIPS) || (defined(TARGET_SPARC) && TARGET_ABI_BITS == 32)
-#define TARGET_RLIM_INFINITY	0x7fffffffUL
-#define TARGET_RLIM64_INFINITY	0x7fffffffffffffffull
-#else
-#define TARGET_RLIM_INFINITY	((abi_ulong)-1)
-#define TARGET_RLIM64_INFINITY	((uint64_t)-1)
-#endif
+#include "syscall_rlimit.h"
 
-#if defined(TARGET_MIPS) || defined(TARGET_ABI_SOLARIS)
-#define TARGET_RLIMIT_CPU		0
-#define TARGET_RLIMIT_FSIZE		1
-#define TARGET_RLIMIT_DATA		2
-#define TARGET_RLIMIT_STACK		3
-#define TARGET_RLIMIT_CORE		4
-#define TARGET_RLIMIT_RSS		7
-#define TARGET_RLIMIT_NPROC		8
-#define TARGET_RLIMIT_NOFILE		5
-#define TARGET_RLIMIT_MEMLOCK		9
-#define TARGET_RLIMIT_AS		6
-#define TARGET_RLIMIT_LOCKS		10
-#define TARGET_RLIMIT_SIGPENDING	11
-#define TARGET_RLIMIT_MSGQUEUE		12
-#define TARGET_RLIMIT_NICE		13
-#define TARGET_RLIMIT_RTPRIO		14
-#else
-#define TARGET_RLIMIT_CPU		0
-#define TARGET_RLIMIT_FSIZE		1
-#define TARGET_RLIMIT_DATA		2
-#define TARGET_RLIMIT_STACK		3
-#define TARGET_RLIMIT_CORE		4
-#define TARGET_RLIMIT_RSS		5
-#if defined(TARGET_SPARC)
-#define TARGET_RLIMIT_NOFILE		6
-#define TARGET_RLIMIT_NPROC		7
-#else
-#define TARGET_RLIMIT_NPROC		6
-#define TARGET_RLIMIT_NOFILE		7
-#endif
-#define TARGET_RLIMIT_MEMLOCK		8
-#define TARGET_RLIMIT_AS		9
-#define TARGET_RLIMIT_LOCKS		10
-#define TARGET_RLIMIT_SIGPENDING	11
-#define TARGET_RLIMIT_MSGQUEUE		12
-#define TARGET_RLIMIT_NICE		13
-#define TARGET_RLIMIT_RTPRIO		14
-#endif
+// #if defined(TARGET_ALPHA)
+// #define TARGET_RLIM_INFINITY	0x7fffffffffffffffull
+// #elif defined(TARGET_MIPS) || (defined(TARGET_SPARC) && TARGET_ABI_BITS == 32)
+// #define TARGET_RLIM_INFINITY	0x7fffffffUL
+// #define TARGET_RLIM64_INFINITY	0x7fffffffffffffffull
+// #else
+// #define TARGET_RLIM_INFINITY	((abi_ulong)-1)
+// #define TARGET_RLIM64_INFINITY	((uint64_t)-1)
+// #endif
+// 
+// #if defined(TARGET_MIPS) || defined(TARGET_ABI_SOLARIS)
+// #define TARGET_RLIMIT_CPU		0
+// #define TARGET_RLIMIT_FSIZE		1
+// #define TARGET_RLIMIT_DATA		2
+// #define TARGET_RLIMIT_STACK		3
+// #define TARGET_RLIMIT_CORE		4
+// #define TARGET_RLIMIT_RSS		7
+// #define TARGET_RLIMIT_NPROC		8
+// #define TARGET_RLIMIT_NOFILE		5
+// #define TARGET_RLIMIT_MEMLOCK		9
+// #define TARGET_RLIMIT_AS		6
+// #define TARGET_RLIMIT_LOCKS		10
+// #define TARGET_RLIMIT_SIGPENDING	11
+// #define TARGET_RLIMIT_MSGQUEUE		12
+// #define TARGET_RLIMIT_NICE		13
+// #define TARGET_RLIMIT_RTPRIO		14
+// #else
+// #define TARGET_RLIMIT_CPU		0
+// #define TARGET_RLIMIT_FSIZE		1
+// #define TARGET_RLIMIT_DATA		2
+// #define TARGET_RLIMIT_STACK		3
+// #define TARGET_RLIMIT_CORE		4
+// #define TARGET_RLIMIT_RSS		5
+// #if defined(TARGET_SPARC)
+// #define TARGET_RLIMIT_NOFILE		6
+// #define TARGET_RLIMIT_NPROC		7
+// #else
+// #define TARGET_RLIMIT_NPROC		6
+// #define TARGET_RLIMIT_NOFILE		7
+// #endif
+// #define TARGET_RLIMIT_MEMLOCK		8
+// #define TARGET_RLIMIT_AS		9
+// #define TARGET_RLIMIT_LOCKS		10
+// #define TARGET_RLIMIT_SIGPENDING	11
+// #define TARGET_RLIMIT_MSGQUEUE		12
+// #define TARGET_RLIMIT_NICE		13
+// #define TARGET_RLIMIT_RTPRIO		14
+// #endif
 
 struct target_pollfd {
     int fd;           /* file descriptor */
@@ -1398,13 +1383,6 @@ struct target_termio {
 #endif
 	unsigned char c_line;		/* line discipline */
 	unsigned char c_cc[TARGET_NCC];	/* control characters */
-};
-
-struct target_winsize {
-	unsigned short ws_row;
-	unsigned short ws_col;
-	unsigned short ws_xpixel;
-	unsigned short ws_ypixel;
 };
 
 #include "termbits.h"
@@ -2529,7 +2507,7 @@ struct target_statfs64 {
 	short		__pad1;
 	uint32_t	f_bsize;
 	uint32_t	f_frsize;	/* Fragment size - unsupported */
-        uint32_t        __pad2;
+	uint32_t    __pad2;
 #else
 	uint32_t	f_type;
 	uint32_t	f_bsize;
@@ -2541,6 +2519,8 @@ struct target_statfs64 {
 	uint64_t	f_files;
 	uint64_t	f_ffree;
 	uint64_t	f_bavail;
+	
+	/* Linux specials */
 	target_fsid_t	f_fsid;
 	uint32_t	f_namelen;
 	uint32_t	f_spare[6];
