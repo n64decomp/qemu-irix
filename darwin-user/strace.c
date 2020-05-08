@@ -10,9 +10,10 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
-#include <linux/if_packet.h>
+//#include <linux/if_packet.h>
 #include <sched.h>
 #include "qemu.h"
+#include "shim_gettid.h"
 
 int do_strace=0;
 
@@ -165,9 +166,9 @@ static void print_si_code(int arg)
     case SI_USER:
         codename = "SI_USER";
         break;
-    case SI_KERNEL:
-        codename = "SI_KERNEL";
-        break;
+    // case SI_KERNEL:
+    //     codename = "SI_KERNEL";
+    //     break;
     case SI_QUEUE:
         codename = "SI_QUEUE";
         break;
@@ -180,12 +181,12 @@ static void print_si_code(int arg)
     case SI_ASYNCIO:
         codename = "SI_ASYNCIO";
         break;
-    case SI_SIGIO:
-        codename = "SI_SIGIO";
-        break;
-    case SI_TKILL:
-        codename = "SI_TKILL";
-        break;
+    // case SI_SIGIO:
+    //     codename = "SI_SIGIO";
+    //     break;
+    // case SI_TKILL:
+    //     codename = "SI_TKILL";
+    //     break;
     default:
         gemu_log("%d", arg);
         return;
@@ -381,37 +382,37 @@ print_sockaddr(abi_ulong addr, abi_long addrlen)
             gemu_log("}");
             break;
         }
-        case AF_PACKET: {
-            struct target_sockaddr_ll *ll = (struct target_sockaddr_ll *)sa;
-            uint8_t *c = (uint8_t *)&ll->sll_addr;
-            gemu_log("{sll_family=AF_PACKET,"
-                     "sll_protocol=htons(0x%04x),if%d,pkttype=",
-                     ntohs(ll->sll_protocol), ll->sll_ifindex);
-            switch (ll->sll_pkttype) {
-            case PACKET_HOST:
-                gemu_log("PACKET_HOST");
-                break;
-            case PACKET_BROADCAST:
-                gemu_log("PACKET_BROADCAST");
-                break;
-            case PACKET_MULTICAST:
-                gemu_log("PACKET_MULTICAST");
-                break;
-            case PACKET_OTHERHOST:
-                gemu_log("PACKET_OTHERHOST");
-                break;
-            case PACKET_OUTGOING:
-                gemu_log("PACKET_OUTGOING");
-                break;
-            default:
-                gemu_log("%d", ll->sll_pkttype);
-                break;
-            }
-            gemu_log(",sll_addr=%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
-                     c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]);
-            gemu_log("}");
-            break;
-        }
+        // case AF_PACKET: {
+        //     struct target_sockaddr_ll *ll = (struct target_sockaddr_ll *)sa;
+        //     uint8_t *c = (uint8_t *)&ll->sll_addr;
+        //     gemu_log("{sll_family=AF_PACKET,"
+        //              "sll_protocol=htons(0x%04x),if%d,pkttype=",
+        //              ntohs(ll->sll_protocol), ll->sll_ifindex);
+        //     switch (ll->sll_pkttype) {
+        //     case PACKET_HOST:
+        //         gemu_log("PACKET_HOST");
+        //         break;
+        //     case PACKET_BROADCAST:
+        //         gemu_log("PACKET_BROADCAST");
+        //         break;
+        //     case PACKET_MULTICAST:
+        //         gemu_log("PACKET_MULTICAST");
+        //         break;
+        //     case PACKET_OTHERHOST:
+        //         gemu_log("PACKET_OTHERHOST");
+        //         break;
+        //     case PACKET_OUTGOING:
+        //         gemu_log("PACKET_OUTGOING");
+        //         break;
+        //     default:
+        //         gemu_log("%d", ll->sll_pkttype);
+        //         break;
+        //     }
+        //     gemu_log(",sll_addr=%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+        //              c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]);
+        //     gemu_log("}");
+        //     break;
+        // }
         default:
             gemu_log("{sa_family=%d, sa_data={", sa->sa_family);
             for (i = 0; i < 13; i++) {
@@ -438,9 +439,9 @@ print_socket_domain(int domain)
     case PF_INET:
         gemu_log("PF_INET");
         break;
-    case PF_PACKET:
-        gemu_log("PF_PACKET");
-        break;
+    // case PF_PACKET:
+    //     gemu_log("PF_PACKET");
+    //     break;
     default:
         gemu_log("%d", domain);
         break;
@@ -477,6 +478,7 @@ print_socket_type(int type)
 static void
 print_socket_protocol(int domain, int type, int protocol)
 {
+    /*
     if (domain == AF_PACKET
 #ifdef TARGET_SOCK_PACKET
         || (domain == AF_INET && type == TARGET_SOCK_PACKET)
@@ -491,6 +493,7 @@ print_socket_protocol(int domain, int type, int protocol)
         }
         return;
     }
+    */
 
     switch (protocol) {
     case IPPROTO_IP:
@@ -846,7 +849,9 @@ UNUSED static struct flags open_flags[] = {
     FLAG_TARGET(O_NOFOLLOW),
     FLAG_TARGET(O_NONBLOCK),      /* also O_NDELAY */
     FLAG_TARGET(O_DSYNC),
+#ifdef __O_SYNC
     FLAG_TARGET(__O_SYNC),
+#endif
     FLAG_TARGET(O_TRUNC),
 #ifdef O_DIRECT
     FLAG_TARGET(O_DIRECT),
@@ -874,21 +879,39 @@ UNUSED static struct flags mount_flags[] = {
 #ifdef MS_DIRSYNC
     FLAG_GENERIC(MS_DIRSYNC),
 #endif
+#ifdef MS_MANDLOCK
     FLAG_GENERIC(MS_MANDLOCK),
+#endif
 #ifdef MS_MOVE
     FLAG_GENERIC(MS_MOVE),
 #endif
+#ifdef MS_NOATIME
     FLAG_GENERIC(MS_NOATIME),
+#endif
+#ifdef MS_NODEV
     FLAG_GENERIC(MS_NODEV),
+#endif
+#ifdef MS_NODIRATIME
     FLAG_GENERIC(MS_NODIRATIME),
+#endif
+#ifdef MS_NOEXEC
     FLAG_GENERIC(MS_NOEXEC),
+#endif
+#ifdef MS_NOSUID
     FLAG_GENERIC(MS_NOSUID),
+#endif
+#ifdef MS_RDONLY
     FLAG_GENERIC(MS_RDONLY),
+#endif
 #ifdef MS_RELATIME
     FLAG_GENERIC(MS_RELATIME),
 #endif
+#ifdef MS_REMOUNT
     FLAG_GENERIC(MS_REMOUNT),
+#endif
+#ifdef MS_SYNCHRONOUS
     FLAG_GENERIC(MS_SYNCHRONOUS),
+#endif
     FLAG_END,
 };
 
@@ -910,9 +933,15 @@ UNUSED static struct flags mmap_prot_flags[] = {
     FLAG_GENERIC(PROT_EXEC),
     FLAG_GENERIC(PROT_READ),
     FLAG_GENERIC(PROT_WRITE),
+#ifdef PROT_SEM
     FLAG_TARGET(PROT_SEM),
+#endif
+#ifdef PROT_GROWSDOWN
     FLAG_GENERIC(PROT_GROWSDOWN),
+#endif
+#ifdef PROT_GROWSUP
     FLAG_GENERIC(PROT_GROWSUP),
+#endif
     FLAG_END,
 };
 
@@ -940,6 +969,7 @@ UNUSED static struct flags mmap_flags[] = {
     FLAG_END,
 };
 
+#ifdef TARGET_NR_clone
 UNUSED static struct flags clone_flags[] = {
     FLAG_GENERIC(CLONE_VM),
     FLAG_GENERIC(CLONE_FS),
@@ -977,24 +1007,51 @@ UNUSED static struct flags clone_flags[] = {
 #endif
     FLAG_END,
 };
+#endif /* TARGET_NR_clone */
 
 UNUSED static struct flags msg_flags[] = {
     /* send */
+#ifdef MSG_CONFIRM
     FLAG_GENERIC(MSG_CONFIRM),
+#endif
+#ifdef MSG_DONTROUTE
     FLAG_GENERIC(MSG_DONTROUTE),
+#endif
+#ifdef MSG_DONTWAIT
     FLAG_GENERIC(MSG_DONTWAIT),
+#endif
+#ifdef MSG_EOR
     FLAG_GENERIC(MSG_EOR),
+#endif
+#ifdef MSG_MORE
     FLAG_GENERIC(MSG_MORE),
+#endif
+#ifdef MSG_NOSIGNAL
     FLAG_GENERIC(MSG_NOSIGNAL),
+#endif
+#ifdef MSG_OOB
     FLAG_GENERIC(MSG_OOB),
+#endif
     /* recv */
+#ifdef MSG_CMSG_CLOEXEC
     FLAG_GENERIC(MSG_CMSG_CLOEXEC),
+#endif
+#ifdef MSG_ERRQUEUE
     FLAG_GENERIC(MSG_ERRQUEUE),
+#endif
+#ifdef MSG_PEEK
     FLAG_GENERIC(MSG_PEEK),
+#endif
+#ifdef MSG_TRUNC
     FLAG_GENERIC(MSG_TRUNC),
+#endif
+#ifdef MSG_WAITALL
     FLAG_GENERIC(MSG_WAITALL),
+#endif
     /* recvmsg */
+#ifdef MSG_CTRUNC
     FLAG_GENERIC(MSG_CTRUNC),
+#endif
     FLAG_END,
 };
 
@@ -1567,6 +1624,7 @@ print_socket(const struct syscallname *name,
     gemu_log(",");
     print_socket_type(type);
     gemu_log(",");
+    /*
     if (domain == AF_PACKET
 #ifdef TARGET_SOCK_PACKET
         || (domain == AF_INET && type == TARGET_SOCK_PACKET)
@@ -1574,6 +1632,7 @@ print_socket(const struct syscallname *name,
        ) {
         protocol = tswap16(protocol);
     }
+    */
     print_socket_protocol(domain, type, protocol);
     print_syscall_epilogue(name);
 }
@@ -2650,7 +2709,7 @@ print_syscall(int num,
     int i;
     const char *format="%s(" TARGET_ABI_FMT_ld "," TARGET_ABI_FMT_ld "," TARGET_ABI_FMT_ld "," TARGET_ABI_FMT_ld "," TARGET_ABI_FMT_ld "," TARGET_ABI_FMT_ld ")";
 
-    gemu_log("%ld ", syscall(SYS_gettid) );
+    gemu_log("%d ", shim_gettid() );
 
     for(i=0;i<nsyscalls;i++)
         if( scnames[i].nr == num ) {

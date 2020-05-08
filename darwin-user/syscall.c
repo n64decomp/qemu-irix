@@ -130,6 +130,7 @@
 #include "qemu.h"
 #include "shim_fallocate.h"
 #include "shim_timers.h"
+#include "shim_gettid.h"
 
 
 // TODO: remove these clone flags, as macOS only has fork
@@ -271,18 +272,6 @@ static inline type name (type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5,
 #define TARGET_NR__llseek TARGET_NR_llseek
 #endif
 
-/* Implement this syscall based on:
- * http://elliotth.blogspot.com/2012/04/gettid-on-mac-os.html
- * Linux macro: 
- *   #define __NR_sys_gettid __NR_gettid
- *   _syscall0(int, sys_gettid)
- * */
-int sys_gettid(void);
-int sys_gettid(void) {
-    uintptr_t tid = (uintptr_t)pthread_self();
-
-    return (int)tid;
-}
 
 #if defined(TARGET_NR_getdents) && defined(__NR_getdents)
 _syscall3(int, sys_getdents, uint, fd, struct linux_dirent *, dirp, uint, count);
@@ -6397,7 +6386,7 @@ static void *clone_func(void *arg)
     cpu = ENV_GET_CPU(env);
     thread_cpu = cpu;
     ts = (TaskState *)cpu->opaque;
-    info->tid = sys_gettid();
+    info->tid = shim_gettid();
     task_settid(ts);
 #ifdef TARGET_ABI_IRIX
     /* TODO: which fields in the PRDA are filled in by the IRIX kernel? */
@@ -12482,7 +12471,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
 #endif
 #ifdef TARGET_NR_gettid
     case TARGET_NR_gettid:
-        ret = get_errno(sys_gettid());
+        ret = get_errno(shim_gettid());
         break;
 #endif
 #ifdef TARGET_NR_readahead
