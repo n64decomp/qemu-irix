@@ -41,7 +41,7 @@ struct target_dirent {
 	char d_name[1];
 };
 /* size of struct target_dirent without the name array */
-#define target_dirent_len (offsetof(struct target_dirent, d_name));
+#define target_dirent_len (offsetof(struct target_dirent, d_name))
 
 /* IRIX sys/types.h */
 typedef uint64_t target_ino64_t;

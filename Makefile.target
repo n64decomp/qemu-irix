@@ -139,7 +139,7 @@ QEMU_CFLAGS+=-I$(SRC_PATH)/darwin-user/$(TARGET_ABI_DIR) \
              -I$(SRC_PATH)/darwin-user
 
 obj-y += darwin-user/
-obj-y += gdbstub.o
+obj-y += gdbstub.o thunk.o
 
 endif #CONFIG_DARWIN_USER
 
