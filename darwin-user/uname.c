@@ -121,7 +121,7 @@ static int relstr_to_int(const char *s)
 int get_osversion(void)
 {
     static int osversion;
-    struct new_utsname buf;
+    struct utsname buf;
     const char *s;
 
     if (osversion)
@@ -144,7 +144,7 @@ void init_qemu_uname_release(void)
      * a specific fake version number, we might want to fake a minimum
      * target kernel version.
      */
-    struct new_utsname buf;
+    struct utsname buf;
 
     if (qemu_uname_release && *qemu_uname_release) {
         return;
