@@ -594,7 +594,6 @@ static void QEMU_NORETURN dump_core_and_abort(CPUArchState *env, int target_sig)
     struct sigaction act;
 
     host_sig = target_to_host_signal(target_sig);
-    // TODO: why isn't this function defined anywhere? macro?
     trace_user_force_sig(env, target_sig, host_sig);
     gdb_signalled(env, target_sig);
 
@@ -647,7 +646,6 @@ int queue_signal(CPUArchState *env, int sig, int si_type,
     CPUState *cpu = ENV_GET_CPU(env);
     TaskState *ts = cpu->opaque;
 
-    /* is this a real function? */
     trace_user_queue_signal(env, sig);
 
     info->si_code = deposit32(info->si_code, 16, 16, si_type);
