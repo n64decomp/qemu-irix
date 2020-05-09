@@ -21,7 +21,7 @@
 /* This is the size of the host kernel's sigset_t, needed where we make
  * direct system calls that take a sigset_t pointer and a size.
  */
-#define SIGSET_T_SIZE (_NSIG / 8)
+#define SIGSET_T_SIZE (NSIG / 8)
 
 /* This struct is used to hold certain information about the image.
  * Basically, it replicates in user space what would be certain

@@ -21,6 +21,7 @@
 #include <sys/ucontext.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
+#include <sys/signal.h>
 
 #include "qemu.h"
 #include "qemu-common.h"
@@ -38,7 +39,7 @@ static struct target_sigaction sigact_table[TARGET_NSIG];
 static void host_signal_handler(int host_signum, siginfo_t *info,
                                 void *puc);
 
-static uint8_t host_to_target_signal_table[_NSIG] = {
+static uint8_t host_to_target_signal_table[NSIG] = {
     [SIGHUP] = TARGET_SIGHUP,
     [SIGINT] = TARGET_SIGINT,
     [SIGQUIT] = TARGET_SIGQUIT,
@@ -71,17 +72,31 @@ static uint8_t host_to_target_signal_table[_NSIG] = {
     [SIGPROF] = TARGET_SIGPROF,
     [SIGWINCH] = TARGET_SIGWINCH,
     [SIGIO] = TARGET_SIGIO,
+#ifdef SIGPWR
     [SIGPWR] = TARGET_SIGPWR,
+#endif
     [SIGSYS] = TARGET_SIGSYS,
     /* next signals stay the same */
     /* Nasty hack: Reverse SIGRTMIN and SIGRTMAX to avoid overlap with
        host libpthread signals.  This assumes no one actually uses SIGRTMAX :-/
        To fix this properly we need to do manual signal delivery multiplexed
        over a single host signal.  */
+#if defined(__SIGRTMIN) && defined(__SIGRTMAX)
     [__SIGRTMIN] = __SIGRTMAX,
     [__SIGRTMAX] = __SIGRTMIN,
+#endif
 };
 static uint8_t target_to_host_signal_table[TARGET_NSIG];
+
+/** `sigorset` is a Linux specific function in `signal.h` that provides the union (logical OR)
+ * of two `sigset_t`s. Since macOS `sigset_t` is a u32, this is simple to shim.
+ * http://refspecs.linux-foundation.org/LSB_4.0.0/LSB-Core-generic/LSB-Core-generic/baselib-sigorset.html
+ */
+static int inline sigorset(sigset_t *dest, const sigset_t *left, const sigset_t *right) {
+    *dest = *left | *right;
+
+    return 0;
+}
 
 static inline int on_sig_stack(unsigned long sp)
 {
@@ -97,7 +112,7 @@ static inline int sas_ss_flags(unsigned long sp)
 
 int host_to_target_signal(int sig)
 {
-    if (sig < 0 || sig >= _NSIG)
+    if (sig < 0 || sig >= NSIG)
         return sig;
     return host_to_target_signal_table[sig];
 }
@@ -137,7 +152,7 @@ static void host_to_target_sigset_internal(target_sigset_t *d,
 {
     int i;
     target_sigemptyset(d);
-    for (i = 1; i <= _NSIG; i++) {
+    for (i = 1; i <= NSIG; i++) {
         if (sigismember(s, i)) {
             target_sigaddset(d, host_to_target_signal(i));
         }
@@ -319,8 +334,8 @@ static inline void host_to_target_siginfo_noswap(target_siginfo_t *tinfo,
 
     switch (si_code) {
     case SI_USER:
-    case SI_TKILL:
-    case SI_KERNEL:
+    // case SI_TKILL:
+    //case SI_KERNEL:
         /* Sent via kill(), tkill() or tgkill(), or direct from the kernel.
          * These are the only unspoofable si_code values.
          */
@@ -338,13 +353,13 @@ static inline void host_to_target_siginfo_noswap(target_siginfo_t *tinfo,
 #endif
             tinfo->_sifields._sigchld._status
                 = host_to_target_waitstatus(info->si_status);
-            tinfo->_sifields._sigchld._utime = info->si_utime;
-            tinfo->_sifields._sigchld._stime = info->si_stime;
+            // tinfo->_sifields._sigchld._utime = info->si_utime;
+            // tinfo->_sifields._sigchld._stime = info->si_stime;
             si_type = QEMU_SI_CHLD;
             break;
         case TARGET_SIGIO:
             tinfo->_sifields._sigpoll._band = info->si_band;
-            tinfo->_sifields._sigpoll._fd = info->si_fd;
+            //tinfo->_sifields._sigpoll._fd = info->si_fd;
             si_type = QEMU_SI_POLL;
             break;
         default:
@@ -495,11 +510,11 @@ void signal_init(CPUArchState *env)
     int host_sig;
 
     /* generate signal conversion tables */
-    for(i = 1; i < _NSIG; i++) {
+    for(i = 1; i < NSIG; i++) {
         if (host_to_target_signal_table[i] == 0)
             host_to_target_signal_table[i] = i;
     }
-    for(i = 1; i < _NSIG; i++) {
+    for(i = 1; i < NSIG; i++) {
         j = host_to_target_signal_table[i];
         if (j < TARGET_NSIG)
             target_to_host_signal_table[j] = i;
@@ -579,6 +594,7 @@ static void QEMU_NORETURN dump_core_and_abort(CPUArchState *env, int target_sig)
     struct sigaction act;
 
     host_sig = target_to_host_signal(target_sig);
+    // TODO: why isn't this function defined anywhere? macro?
     trace_user_force_sig(env, target_sig, host_sig);
     gdb_signalled(env, target_sig);
 
@@ -631,6 +647,7 @@ int queue_signal(CPUArchState *env, int sig, int si_type,
     CPUState *cpu = ENV_GET_CPU(env);
     TaskState *ts = cpu->opaque;
 
+    /* is this a real function? */
     trace_user_queue_signal(env, sig);
 
     info->si_code = deposit32(info->si_code, 16, 16, si_type);
