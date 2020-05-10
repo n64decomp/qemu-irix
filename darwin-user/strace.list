@@ -1734,3 +1734,6 @@
 #ifdef TARGET_NR_usync_cntl
 { TARGET_NR_usync_cntl, "usync_cntl", NULL, NULL, NULL },
 #endif
+#ifdef TARGET_NR_sysinfosgi
+{ TARGET_NR_sysinfosgi, "sysinfosgi", NULL, NULL, NULL },
+#endif

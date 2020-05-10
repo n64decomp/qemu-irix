@@ -349,8 +349,18 @@
 #define TARGET_NR_sysinfo_cpuarch       6
 #define TARGET_NR_sysinfo_hwserial      7
 #define TARGET_NR_sysinfo_hwproducer    8
-#define TARGET_NR_sysinfo_processors    109
 
+#define TARGET_NR_sysinfo_mips_vendor          100 /* return system provider */
+#define TARGET_NR_sysinfo_mips_osprovider      101 /* return OS manufacturer */
+#define TARGET_NR_sysinfo_mips_osname          102 /* return OS name */
+#define TARGET_NR_sysinfo_mips_hwname          103 /* return system name */
+#define TARGET_NR_sysinfo_mips_numprocessor    104 /* return number of processors */
+#define TARGET_NR_sysinfo_mips_hostid          105 /* return hostid */
+#define TARGET_NR_sysinfo_mips_osrelmaj        106 /* return OS major release number */
+#define TARGET_NR_sysinfo_mips_osrelmin        107 /* return OS minor release number */
+#define TARGET_NR_sysinfo_mips_osrelpatch      108 /* return OS release number */
+#define TARGET_NR_sysinfo_mips_processors      109 /* return CPU revison id */
+#define TARGET_NR_sysinfo_mips_availprocessors 110 /* return number of available processors */
 
 /* utssyssgi(obuf, ibuf, cmd) */
 #define TARGET_NR_utssys_uname          (0)

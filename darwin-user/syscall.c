@@ -10814,6 +10814,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
             // ret == bytes read, or target error code
 
             dirp = fdopendir(dir_fd);
+            gemu_log("\n\tgetdents fdopendir: %p\n", dirp);
             if (!dirp) {
                 ret = -host_to_target_errno(errno);
                 goto fail;
@@ -10824,12 +10825,16 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
                 ret = -TARGET_ENOMEM;
                 goto fail;
             }
+            gemu_log("\n\tgetdents host_dirp: %p\n", host_dirp);
+
             
             // collect readdir calls into getdents dirp * buffer
             target_dirp = lock_user(VERIFY_WRITE, arg2, count, 0);
             if (!target_dirp) {
                 goto efault;
             }
+            gemu_log("\n\tgetdents target_dirp: %p\n", target_dirp);
+
 
             struct dirent *de;
             struct target_dirent *tde = target_dirp;
@@ -10837,16 +10842,11 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
             uint target_reclen;
             uint name_len;
 
-            for (;;) {
-                de = readdir(dirp);
-                if (!de) {
-                    found_err = TRUE;
-                    break;
-                }
+            while ((de = readdir(dirp))) {
                 // check if new entry will overflow the target buffer
                 name_len = de->d_namlen + 1;
                 target_reclen = target_dirent_len + name_len;
-                // TODO -> QEMU_ALIGN_UP(target_reclen, alignof(struct target_dirent))?
+                // is this the correct way to align this structure..?
                 target_reclen = QEMU_ALIGN_UP(target_reclen, __alignof(struct target_dirent));
                 if (bytes_used + target_reclen > count) {
                     break;
@@ -10868,8 +10868,9 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
                 ret = bytes_used;
             }
             unlock_user(target_dirp, arg2, ret);
-            g_free(dirp);
-            // handle possible readdir errors here
+            // Don't close the `DIR *` pointer, as that will close the fd 
+            // which was used in `fdopendir`
+            // closedir(dirp);
         }
 // Old Linux code
 // #ifdef __NR_getdents
@@ -14613,8 +14614,38 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
             strncpy(target_buf, "Qemu", arg3-1);
             break;
 
-        case TARGET_NR_sysinfo_processors:
+        case TARGET_NR_sysinfo_mips_vendor:
+            strncpy(target_buf, "SGI", arg3-1);
+            break;
+        case TARGET_NR_sysinfo_mips_osprovider:
+            strncpy(target_buf, "Qemu", arg3-1);
+            break;
+        case TARGET_NR_sysinfo_mips_osname:
+            strncpy(target_buf, "IRIX", arg3-1);
+            break;
+        case TARGET_NR_sysinfo_mips_hwname:
+            strncpy(target_buf, "IP22", arg3-1);
+            break;
+        case TARGET_NR_sysinfo_mips_numprocessor:
+            strncpy(target_buf, "1", arg3-1);
+            break;
+        case TARGET_NR_sysinfo_mips_hostid:
+            strncpy(target_buf, "c01a4b05", arg3-1);
+            break;
+        case TARGET_NR_sysinfo_mips_osrelmaj:
+            strncpy(target_buf, "6", arg3-1);
+            break;
+        case TARGET_NR_sysinfo_mips_osrelmin:
+            strncpy(target_buf, "5", arg3-1);
+            break;
+        case TARGET_NR_sysinfo_mips_osrelpatch:
+            strncpy(target_buf, "0", arg3-1);
+            break;
+        case TARGET_NR_sysinfo_mips_processors:
             strncpy(target_buf, "R4000 3.0", arg3-1);
+            break;
+        case TARGET_NR_sysinfo_mips_availprocessors:
+            strncpy(target_buf, "1", arg3-1);
             break;
         default:
             gemu_log("qemu: Unsupported syscall: sgisysinfo(%d)\n", (int)arg1);
