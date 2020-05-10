@@ -10814,7 +10814,6 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
             // ret == bytes read, or target error code
 
             dirp = fdopendir(dir_fd);
-            gemu_log("\n\tgetdents fdopendir: %p\n", dirp);
             if (!dirp) {
                 ret = -host_to_target_errno(errno);
                 goto fail;
@@ -10825,17 +10824,13 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
                 ret = -TARGET_ENOMEM;
                 goto fail;
             }
-            gemu_log("\n\tgetdents host_dirp: %p\n", host_dirp);
 
-            
             // collect readdir calls into getdents dirp * buffer
             target_dirp = lock_user(VERIFY_WRITE, arg2, count, 0);
             if (!target_dirp) {
                 goto efault;
             }
-            gemu_log("\n\tgetdents target_dirp: %p\n", target_dirp);
-
-
+            
             struct dirent *de;
             struct target_dirent *tde = target_dirp;
             uint bytes_used = 0;
