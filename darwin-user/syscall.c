@@ -10806,22 +10806,17 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
     case TARGET_NR_getdents:
         {
             struct target_dirent *target_dirp;
-            struct dirent *host_dirp;
             DIR *dirp;
             abi_long dir_fd = arg1;
             abi_long count = arg3;
-            int found_err = FALSE;
-            // ret == bytes read, or target error code
+
+            // ret == >0 => bytes read
+            //         0 => end of directory
+            //        <0 => -(target errno)
 
             dirp = fdopendir(dir_fd);
             if (!dirp) {
                 ret = -host_to_target_errno(errno);
-                goto fail;
-            }
-
-            host_dirp = g_try_malloc(count);
-            if (!host_dirp) {
-                ret = -TARGET_ENOMEM;
                 goto fail;
             }
 
@@ -10837,10 +10832,11 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
             uint target_reclen;
             uint name_len;
 
+            errno = 0;
             while ((de = readdir(dirp))) {
                 // check if new entry will overflow the target buffer
                 name_len = de->d_namlen + 1;
-                target_reclen = target_dirent_len + name_len;
+                target_reclen = TARGET_DIRENT_LEN + name_len;
                 // is this the correct way to align this structure..?
                 target_reclen = QEMU_ALIGN_UP(target_reclen, __alignof(struct target_dirent));
                 if (bytes_used + target_reclen > count) {
@@ -10857,7 +10853,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
                 bytes_used += target_reclen;
             }
 
-            if (found_err) {
+            if (errno != 0) {
                 ret = -host_to_target_errno(errno);
             } else {
                 ret = bytes_used;
@@ -10867,112 +10863,6 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
             // which was used in `fdopendir`
             // closedir(dirp);
         }
-// Old Linux code
-// #ifdef __NR_getdents
-//         {
-//             struct target_dirent *target_dirp;
-//             struct linux_dirent *dirp;
-//             abi_long count = arg3;
-// 
-//             dirp = g_try_malloc(count);
-//             if (!dirp) {
-//                 ret = -TARGET_ENOMEM;
-//                 goto fail;
-//             }
-// 
-//             ret = get_errno(sys_getdents(arg1, dirp, count));
-//             if (!is_error(ret)) {
-//                 struct linux_dirent *de;
-// 		struct target_dirent *tde;
-//                 int len = ret;
-//                 int reclen, treclen;
-// 		int count1, tnamelen;
-// 
-// 		count1 = 0;
-//                 de = dirp;
-//                 if (!(target_dirp = lock_user(VERIFY_WRITE, arg2, count, 0)))
-//                     goto efault;
-// 		tde = target_dirp;
-//                 while (len > 0) {
-//                     reclen = de->d_reclen;
-//                     tnamelen = reclen - offsetof(struct linux_dirent, d_name);
-//                     tnamelen = strnlen(de->d_name, tnamelen) + 1;
-//                     assert(tnamelen >= 0);
-//                     treclen = tnamelen + offsetof(struct target_dirent, d_name);
-//                     /* XXX: avoid buffer overflow, for the price of lost entries */
-//                     if (count1 + treclen > count)
-//                         break;
-//                     __put_user(treclen, &tde->d_reclen);
-//                     __put_user(de->d_ino, &tde->d_ino);
-//                     __put_user(de->d_off, &tde->d_off);
-//                     memcpy(tde->d_name, de->d_name, tnamelen);
-//                     de = (struct linux_dirent *)((char *)de + reclen);
-//                     len -= reclen;
-//                     tde = (struct target_dirent *)((char *)tde + treclen);
-// 		    count1 += treclen;
-//                 }
-// 		ret = count1;
-//                 unlock_user(target_dirp, arg2, ret);
-//             }
-//             g_free(dirp);
-//         }
-// #else
-//         /* Implement getdents in terms of getdents64 */
-//         {
-//             struct linux_dirent64 *dirp;
-//             abi_long count = arg3;
-// 
-//             dirp = lock_user(VERIFY_WRITE, arg2, count, 0);
-//             if (!dirp) {
-//                 goto efault;
-//             }
-//             ret = get_errno(sys_getdents64(arg1, dirp, count));
-//             if (!is_error(ret)) {
-//                 /* Convert the dirent64 structs to target dirent.  We do this
-//                  * in-place, since we can guarantee that a target_dirent is no
-//                  * larger than a dirent64; however this means we have to be
-//                  * careful to read everything before writing in the new format.
-//                  */
-//                 struct linux_dirent64 *de;
-//                 struct target_dirent *tde;
-//                 int len = ret;
-//                 int tlen = 0;
-// 
-//                 de = dirp;
-//                 tde = (struct target_dirent *)dirp;
-//                 while (len > 0) {
-//                     int namelen, treclen;
-//                     int reclen = de->d_reclen;
-//                     uint64_t ino = de->d_ino;
-//                     int64_t off = de->d_off;
-//                     uint8_t type = de->d_type;
-// 
-//                     namelen = de->d_reclen - offsetof(struct linux_dirent64, d_name);
-//                     namelen = strnlen(de->d_name, namelen);
-//                     treclen = offsetof(struct target_dirent, d_name)
-//                         + namelen + 2;
-//                     treclen = QEMU_ALIGN_UP(treclen, sizeof(abi_long));
-// 
-//                     memmove(tde->d_name, de->d_name, namelen + 1);
-//                     __put_user(ino, &tde->d_ino);
-//                     __put_user(off, &tde->d_off);
-//                     __put_user(treclen, &tde->d_reclen);
-// #if !defined TARGET_ABI_IRIX && !defined TARGET_ABI_SOLARIS
-//                     /* The target_dirent type is in what was formerly a padding
-//                      * byte at the end of the structure:
-//                      */
-//                     *(((char *)tde) + treclen - 1) = type;
-// #endif
-//                     de = (struct linux_dirent64 *)((char *)de + reclen);
-//                     tde = (struct target_dirent *)((char *)tde + treclen);
-//                     len -= reclen;
-//                     tlen += treclen;
-//                 }
-//                 ret = tlen;
-//             }
-//             unlock_user(dirp, arg2, ret);
-//         }
-// #endif
 #ifdef TARGET_NR_ngetdents
         if (ret >= 0 && num == TARGET_NR_ngetdents) {
             abi_long *p = lock_user(VERIFY_WRITE, arg4, sizeof(abi_long), 0);
@@ -14484,23 +14374,23 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
                 }
             }
             break;
-    case TARGET_NR_syssgi_sysid:
-        {
-            char * buf = lock_user(VERIFY_WRITE, arg2, 64, 0);
-            if (!buf) {
-                goto efault;
+        case TARGET_NR_syssgi_sysid:
+            {
+                char * buf = lock_user(VERIFY_WRITE, arg2, 64, 0);
+                if (!buf) {
+                    goto efault;
+                }
+                snprintf(buf, 64, "%12llx", 0x08006900000DULL);
+                ret = 0;
+                unlock_user(buf, arg2, 64);
+                break;
             }
-            snprintf(buf, 64, "%12llx", 0x08006900000DULL);
+        case TARGET_NR_syssgi_rldenv:
+        case TARGET_NR_syssgi_tosstsave:
+        case TARGET_NR_syssgi_fpbcopy:
+        case TARGET_NR_syssgi_getprocattr: /* ? 2nd=string 3rd=result ptr */
             ret = 0;
-            unlock_user(buf, arg2, 64);
             break;
-        }
-    case TARGET_NR_syssgi_rldenv:
-    case TARGET_NR_syssgi_tosstsave:
-    case TARGET_NR_syssgi_fpbcopy:
-    case TARGET_NR_syssgi_getprocattr: /* ? 2nd=string 3rd=result ptr */
-        ret = 0;
-        break;
         case TARGET_NR_syssgi_setgroups:
         case TARGET_NR_syssgi_getgroups:
         default:
@@ -14508,7 +14398,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
             ret = -TARGET_ENOSYS;
             break;
         }
-        break;
+    break;
     }
 #endif
 #ifdef TARGET_NR_sginap

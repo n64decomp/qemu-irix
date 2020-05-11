@@ -3336,6 +3336,7 @@ struct target_utsname {
 
 /* wait flags */
 #define TARGET_WEXITED      0001
+#define TARGET_WTRAPPED     0002
 #define TARGET_WSTOPPED     0004
 #define TARGET_WCONTINUED   0010
 #define TARGET_WNOHANG      0100
