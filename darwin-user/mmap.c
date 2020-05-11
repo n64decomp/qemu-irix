@@ -18,6 +18,9 @@
  */
 #include "qemu/osdep.h"
 
+#include <sys/syslimits.h>
+#include <fcntl.h>
+
 #include "qemu.h"
 #include "qemu-common.h"
 #include "translate-all.h"
@@ -367,11 +370,12 @@ abi_long target_mmap(abi_ulong start, abi_ulong len, int prot,
                      int flags, int fd, abi_ulong offset)
 {
     abi_ulong ret, end, real_start, real_end, retaddr, host_offset, host_len;
+    char filePath[PATH_MAX];
 
     mmap_lock();
 #ifdef DEBUG_MMAP
     {
-        printf("mmap: start=0x" TARGET_ABI_FMT_lx
+        printf("\nmmap: start=0x" TARGET_ABI_FMT_lx
                " len=0x" TARGET_ABI_FMT_lx " prot=%c%c%c flags=",
                start, len,
                prot & PROT_READ ? 'r' : '-',
@@ -393,8 +397,28 @@ abi_long target_mmap(abi_ulong start, abi_ulong len, int prot,
             break;
         }
         printf("fd=%d offset=" TARGET_ABI_FMT_lx "\n", fd, offset);
+        if (fcntl(fd, F_GETPATH, filePath) != -1) {
+            printf("fd name=%s\n", filePath);
+        }
     }
 #endif
+
+    /* macOS cannot mmap /dev/zero. It needs `MAP_ANON` with an fd of -1
+     * Catch this scenario and fix
+     * https://stackoverflow.com/questions/28679577/mmapping-dev-zero-on-mac-osx-gives-invalid-argument
+     * https://stackoverflow.com/questions/1188757/retrieve-filename-from-file-descriptor-in-c
+     */
+    if (fd != -1 
+        && !(flags & MAP_ANON) 
+        && fcntl(fd, F_GETPATH, filePath) != -1
+        && strcmp(filePath, "/dev/zero") == 0
+    ) {
+        fd = -1;
+        flags |= MAP_ANON;
+        #ifdef DEBUG_MMAP
+            printf("Changed fd and flags to support mmap /dev/zero\n");
+        #endif
+    }
 
     if (offset & ~TARGET_PAGE_MASK) {
         errno = EINVAL;

@@ -10830,7 +10830,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
             if (!target_dirp) {
                 goto efault;
             }
-            
+
             struct dirent *de;
             struct target_dirent *tde = target_dirp;
             uint bytes_used = 0;
