@@ -7219,11 +7219,46 @@ static inline int target_to_host_mlockall_arg(int arg)
 }
 #endif
 
+static const bitmask_transtbl st_mode_tlb[] = {
+    { TARGET_S_IFMT, TARGET_S_IFIFO, S_IFMT, S_IFIFO },
+    { TARGET_S_IFMT, TARGET_S_IFCHR, S_IFMT, S_IFCHR },
+    { TARGET_S_IFMT, TARGET_S_IFDIR, S_IFMT, S_IFDIR },
+    { TARGET_S_IFMT, TARGET_S_IFBLK, S_IFMT, S_IFBLK },
+    { TARGET_S_IFMT, TARGET_S_IFREG, S_IFMT, S_IFREG },
+    { TARGET_S_IFMT, TARGET_S_IFLNK, S_IFMT, S_IFLNK },
+    { TARGET_S_IFMT, TARGET_S_IFSOCK, S_IFMT, S_IFSOCK },
+    #ifdef S_IFNAM
+    { TARGET_S_IFMT, TARGET_S_IFNAM, S_IFMT, S_IFNAM },
+    #endif
+    { TARGET_S_ISUID, TARGET_S_ISUID, S_ISUID, S_ISUID },
+    { TARGET_S_ISGID, TARGET_S_ISGID, S_ISGID, S_ISGID },
+    { TARGET_S_ISVTX, TARGET_S_ISVTX, S_ISVTX, S_ISVTX },
+    
+    { TARGET_S_IREAD, TARGET_S_IREAD, S_IREAD, S_IREAD },
+    { TARGET_S_IWRITE, TARGET_S_IWRITE, S_IWRITE, S_IWRITE },
+    { TARGET_S_IEXEC, TARGET_S_IEXEC, S_IEXEC, S_IEXEC },
+    { TARGET_S_ENFMT, TARGET_S_ENFMT, S_ISGID, S_ISGID },
+    { TARGET_S_IRWXU, TARGET_S_IRWXU, S_IRWXU, S_IRWXU },
+    { TARGET_S_IRWXU, TARGET_S_IRUSR, S_IRWXU, S_IRUSR },
+    { TARGET_S_IRWXU, TARGET_S_IWUSR, S_IRWXU, S_IWUSR },
+    { TARGET_S_IRWXU, TARGET_S_IXUSR, S_IRWXU, S_IXUSR },
+    { TARGET_S_IRWXG, TARGET_S_IRWXG, S_IRWXG, S_IRWXG },
+    { TARGET_S_IRWXG, TARGET_S_IRGRP, S_IRWXG, S_IRGRP },
+    { TARGET_S_IRWXG, TARGET_S_IWGRP, S_IRWXG, S_IWGRP },
+    { TARGET_S_IRWXG, TARGET_S_IXGRP, S_IRWXG, S_IXGRP },
+    { TARGET_S_IRWXO, TARGET_S_IRWXO, S_IRWXO, S_IRWXO },
+    { TARGET_S_IRWXO, TARGET_S_IROTH, S_IRWXO, S_IROTH },
+    { TARGET_S_IRWXO, TARGET_S_IWOTH, S_IRWXO, S_IWOTH },
+    { TARGET_S_IRWXO, TARGET_S_IXOTH, S_IRWXO, S_IXOTH },
+    { 0, 0, 0, 0 },
+};
+
 static inline abi_long host_to_target_stat(void *cpu_env,
                                              abi_ulong target_addr,
                                              struct stat *host_st)
 {
     struct target_stat *target_st;
+    int cnvt_st_mode = host_to_target_bitmask(host_st->st_mode, st_mode_tlb);
 
     if (!lock_user_struct(VERIFY_WRITE, target_st, target_addr, 0))
         return -TARGET_EFAULT;
@@ -7235,7 +7270,7 @@ static inline abi_long host_to_target_stat(void *cpu_env,
 #endif
     __put_user(host_st->st_dev, &target_st->st_dev);
     __put_user(host_st->st_ino, &target_st->st_ino);
-    __put_user(host_st->st_mode, &target_st->st_mode);
+    __put_user(cnvt_st_mode, &target_st->st_mode);
     __put_user(host_st->st_uid, &target_st->st_uid);
     __put_user(host_st->st_gid, &target_st->st_gid);
     __put_user(host_st->st_nlink, &target_st->st_nlink);

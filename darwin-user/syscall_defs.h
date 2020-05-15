@@ -1929,7 +1929,7 @@ struct target_stat {
 	uint32_t		st_rdev;
 	abi_long		st_pad1[2]; /* Reserved for st_rdev expansion */
 	abi_long		st_size;
-        abi_long                st_pad2;
+    abi_long        st_pad2;
 
 	/*
 	 * Actually this should be timestruc_t st_atime, st_mtime and st_ctime
@@ -1944,7 +1944,7 @@ struct target_stat {
 	int32_t			target_st_ctime;
         abi_long                target_st_ctime_nsec;
 
-        abi_long                st_blksize;
+    abi_long        st_blksize;
 	abi_long		st_blocks;
 	char			st_fstype[16];
 	abi_long		st_projid;
@@ -3450,5 +3450,46 @@ struct target_prthread {
 #define TARGET_PC_PRIO_IO           11
 #define TARGET_PC_SYNC_IO           10
 #endif
+
+/* stat st_mode flags */
+#ifdef TARGET_ABI_IRIX
+/* masks */
+#define	TARGET_S_IFMT		0xF000	/* type of file */
+#define TARGET_S_IAMB		0x1FF	/* access mode bits */
+
+#define	TARGET_S_IFIFO		0x1000	/* fifo */
+#define	TARGET_S_IFCHR		0x2000	/* character special */
+#define	TARGET_S_IFDIR		0x4000	/* directory */
+#define	TARGET_S_IFNAM		0x5000  /* XENIX special named file */
+	#define	TARGET_S_INSEM 		0x1	/* XENIX semaphore subtype of IFNAM */
+	#define	TARGET_S_INSHD 		0x2	/* XENIX shared data subtype of IFNAM */
+#define	TARGET_S_IFBLK		0x6000	/* block special */
+#define	TARGET_S_IFREG		0x8000	/* regular */
+#define	TARGET_S_IFLNK		0xA000	/* symbolic link */
+#define	TARGET_S_IFSOCK		0xC000	/* socket */
+
+#define	TARGET_S_ISUID		0x800	/* set user id on execution */
+#define	TARGET_S_ISGID		0x400	/* set group id on execution */
+#define	TARGET_S_ISVTX		0x200	/* save swapped text even after use */
+
+#define	TARGET_S_IREAD		00400	/* read permission, owner */
+#define	TARGET_S_IWRITE		00200	/* write permission, owner */
+#define	TARGET_S_IEXEC		00100	/* execute/search permission, owner */
+#define	TARGET_S_ENFMT		S_ISGID	/* record locking enforcement flag */
+
+#define	TARGET_S_IRWXU		00700		/* read, write, execute: owner */
+#define	TARGET_S_IRUSR		00400		/* read permission: owner */
+#define	TARGET_S_IWUSR		00200		/* write permission: owner */
+#define	TARGET_S_IXUSR		00100		/* execute permission: owner */
+#define	TARGET_S_IRWXG		00070		/* read, write, execute: group */
+#define	TARGET_S_IRGRP		00040		/* read permission: group */
+#define	TARGET_S_IWGRP		00020		/* write permission: group */
+#define	TARGET_S_IXGRP		00010		/* execute permission: group */
+#define	TARGET_S_IRWXO		00007		/* read, write, execute: other */
+#define	TARGET_S_IROTH		00004		/* read permission: other */
+#define	TARGET_S_IWOTH		00002		/* write permission: other */
+#define	TARGET_S_IXOTH		00001		/* execute permission: other */
+
+#endif /* TARGET_ABI_IRIX */
 
 #endif
