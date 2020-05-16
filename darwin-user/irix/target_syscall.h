@@ -54,5 +54,7 @@ struct target_dirent64 {
 	abi_ushort d_reclen;
 	char d_name[1];
 };
+/* size of struct target_dirent without the name array */
+#define TARGET_DIRENT64_LEN (offsetof(struct target_dirent64, d_name))
 
 #endif

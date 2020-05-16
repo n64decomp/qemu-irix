@@ -10893,7 +10893,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
             } else {
                 ret = bytes_used;
             }
-            unlock_user(target_dirp, arg2, ret);
+            unlock_user(target_dirp, arg2, count);
             // Don't close the `DIR *` pointer, as that will close the fd 
             // which was used in `fdopendir`
             // closedir(dirp);
@@ -10910,83 +10910,63 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
 #ifdef TARGET_NR_ngetdents64
     case TARGET_NR_ngetdents64:
 #endif
-#if defined(TARGET_NR_getdents64) && defined(__NR_getdents64)
+#ifdef TARGET_NR_getdents64
     case TARGET_NR_getdents64:
-#if defined TARGET_ABI_IRIX || defined TARGET_ABI_SOLARIS
-        {
+    {
             struct target_dirent64 *target_dirp;
-            struct linux_dirent64 *dirp;
+            DIR *dirp;
+            abi_long dir_fd = arg1;
             abi_long count = arg3;
 
-        dirp = malloc(count);
-        if (!dirp) {
-                ret = -TARGET_ENOMEM;
+            dirp = fdopendir(dir_fd);
+            if (!dirp) {
+                ret = -host_to_target_errno(errno);
                 goto fail;
             }
 
-            ret = get_errno(sys_getdents64(arg1, dirp, count));
-            if (!is_error(ret)) {
-                struct linux_dirent64 *de;
-        struct target_dirent64 *tde;
-                int len = ret;
-                int reclen, treclen;
-        int count1, tnamelen;
-
-        count1 = 0;
-                de = dirp;
-                if (!(target_dirp = lock_user(VERIFY_WRITE, arg2, count, 0)))
-                    goto efault;
-        tde = target_dirp;
-                while (len > 0) {
-                    reclen = de->d_reclen;
-                    tnamelen = reclen - offsetof(struct linux_dirent64, d_name);
-                    tnamelen = strnlen(de->d_name, tnamelen) + 1;
-                    assert(tnamelen > 0);
-                    treclen = tnamelen + offsetof(struct target_dirent64, d_name);
-                    treclen = QEMU_ALIGN_UP(treclen, sizeof(abi_llong));
-                    /* XXX: avoid buffer overflow, for the price of lost entries */
-                    if (count1 + treclen > count)
-                        break;
-                    __put_user(treclen, &tde->d_reclen);
-                    __put_user(de->d_ino, &tde->d_ino);
-                    __put_user(de->d_off, &tde->d_off);
-                    memcpy(tde->d_name, de->d_name, tnamelen);
-                    de = (struct linux_dirent64 *)((char *)de + reclen);
-                    len -= reclen;
-                    tde = (struct target_dirent64 *)((char *)tde + treclen);
-            count1 += treclen;
-                }
-        ret = count1;
-                unlock_user(target_dirp, arg2, ret);
-            }
-        free(dirp);
-        }
-#else
-        {
-            struct linux_dirent64 *dirp;
-            abi_long count = arg3;
-            if (!(dirp = lock_user(VERIFY_WRITE, arg2, count, 0)))
+            // collect readdir calls into getdents dirp * buffer
+            target_dirp = lock_user(VERIFY_WRITE, arg2, count, 0);
+            if (!target_dirp) {
                 goto efault;
-            ret = get_errno(sys_getdents64(arg1, dirp, count));
-            if (!is_error(ret)) {
-                struct linux_dirent64 *de;
-                int len = ret;
-                int reclen;
-                de = dirp;
-                while (len > 0) {
-                    reclen = de->d_reclen;
-                    if (reclen > len)
-                        break;
-                    __put_user(reclen, &de->d_reclen);
-                    tswap64s((uint64_t *)&de->d_ino);
-                    tswap64s((uint64_t *)&de->d_off);
-                    de = (struct linux_dirent64 *)((char *)de + reclen);
-                    len -= reclen;
-                }
             }
-            unlock_user(dirp, arg2, ret);
+
+            struct dirent *de;
+            struct target_dirent64 *tde = target_dirp;
+            uint bytes_used = 0;
+            uint target_reclen;
+            uint name_len;
+
+            errno = 0;
+            while ((de = readdir(dirp))) {
+                // check if new entry will overflow the target buffer
+                name_len = de->d_namlen + 1;
+                target_reclen = TARGET_DIRENT64_LEN + name_len;
+                // is this the correct way to align this structure..?
+                target_reclen = QEMU_ALIGN_UP(target_reclen, __alignof(struct target_dirent64));
+                if (bytes_used + target_reclen > count) {
+                    break;
+                }
+                // translate from host to target dirent
+                __put_user(de->d_ino, &tde->d_ino);
+                __put_user(de->d_seekoff, &tde->d_off);
+                __put_user(target_reclen, &tde->d_reclen);
+                memcpy(tde->d_name, de->d_name, name_len);
+                // advance pointer in target space
+                // host pointer is moved by calling readdir
+                tde = (struct target_dirent64 *)((char *)tde + target_reclen);
+                bytes_used += target_reclen;
+            }
+
+            if (errno != 0) {
+                ret = -host_to_target_errno(errno);
+            } else {
+                ret = bytes_used;
+            }
+            unlock_user(target_dirp, arg2, count);
+            // Don't close the `DIR *` pointer, as that will close the fd 
+            // which was used in `fdopendir`
+            // closedir(dirp);
         }
-#endif
 #ifdef TARGET_NR_ngetdents64
         if (ret >= 0 && num == TARGET_NR_ngetdents64) {
             abi_long *p = lock_user(VERIFY_WRITE, arg4, sizeof(abi_long), 0);
