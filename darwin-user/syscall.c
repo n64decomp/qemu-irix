@@ -7323,6 +7323,8 @@ static inline abi_long host_to_target_stat64(void *cpu_env,
 #else
         struct target_stat *target_st;
 #endif
+        int cnvt_st_mode = host_to_target_bitmask(host_st->st_mode, st_mode_tlb);
+
 
         if (!lock_user_struct(VERIFY_WRITE, target_st, target_addr, 0))
             return -TARGET_EFAULT;
@@ -7332,7 +7334,7 @@ static inline abi_long host_to_target_stat64(void *cpu_env,
 #ifdef TARGET_STAT64_HAS_BROKEN_ST_INO
         __put_user(host_st->st_ino, &target_st->__st_ino);
 #endif
-        __put_user(host_st->st_mode, &target_st->st_mode);
+        __put_user(cnvt_st_mode, &target_st->st_mode);
         __put_user(host_st->st_nlink, &target_st->st_nlink);
         __put_user(host_st->st_uid, &target_st->st_uid);
         __put_user(host_st->st_gid, &target_st->st_gid);
