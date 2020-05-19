@@ -57,6 +57,7 @@
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <sys/ioctl.h>
+#include <stdbool.h>
 /* #include <sys/statfs.h> not supported on macOS/darwin, convert from statvfs if possble */
 #include <sys/statvfs.h>
 #include <time.h>
@@ -288,6 +289,64 @@ _syscall5(int, _llseek,  uint,  fd, ulong, hi, ulong, lo,
           loff_t *, res, uint, wh);
 #endif
 */
+
+
+/**
+ * catalina_ino_convert:
+ * @param fd: fd of dir that produced struct dirent `de`
+ * @param fd_path: pointer to the (possibly un-initialized) path string of fd
+ * @param fd_path_init: has `fdPath` been initialized
+ * @param de: `struct dirent` produced from `basePath`
+ * @returns ino of `de` as seen from `stat(de->d_name)`
+ *  
+ * Catalina (macOS 10.15) stores certain system critical files and paths
+ * on a separate, read-only partition (https://support.apple.com/en-us/HT210650).
+ * This can cause issues with `ino_t` values returned from dirent when viewed from
+ * the root directory. Ino values seem to change. E.g., the ino of `stat("/Users/")`
+ * differs from 'dp = opendir("\"); readdir(dp)`.
+ * This function attempts to convert back from the readonly ino to the stat ino
+ */
+static ino_t catalina_ino_convert(
+    int fd,
+    char *fd_path, 
+    bool *fd_path_init,
+    const struct dirent *de
+){
+    char de_path[PATH_MAX];
+    struct stat st;
+    int ret = 0;
+    bool is_catalina_ino = ((uint64_t)de->d_ino >> 32) == 0x0fffffff;
+
+    if (is_catalina_ino) {
+        // High bits set seem to imply Catalina readonly ino
+        if (!(*fd_path_init)) {
+            ret = fcntl(fd, F_GETPATH, fd_path);
+            if (ret != -1) { *fd_path_init = TRUE; }
+        }
+
+        if (*fd_path_init) {
+            memset(de_path, '\0', PATH_MAX);
+            pstrcpy(de_path, PATH_MAX, fd_path);
+            pstrcat(de_path, PATH_MAX, "/");
+            pstrcat(de_path, PATH_MAX, de->d_name);
+            ret = stat(de_path, &st);
+            if (ret != -1) {
+                return st.st_ino;
+            } else {
+                // stat failed; don't convert
+                errno = 0;
+                return de->d_ino;
+            }
+        } else {
+            // issue with fcntl; don't convert
+            errno = 0;
+            return de->d_ino;
+        }
+    }
+
+    // do not attempt to convert ino
+    return de->d_ino;
+}
 
 #ifdef TARGET_NR_rt_sigqueueinfo
 _syscall3(int, sys_rt_sigqueueinfo, pid_t, pid, int, sig, siginfo_t *, uinfo)
@@ -7325,9 +7384,9 @@ static inline abi_long host_to_target_stat64(void *cpu_env,
 #endif
         int cnvt_st_mode = host_to_target_bitmask(host_st->st_mode, st_mode_tlb);
 
-
         if (!lock_user_struct(VERIFY_WRITE, target_st, target_addr, 0))
             return -TARGET_EFAULT;
+
         memset(target_st, 0, sizeof(*target_st));
         __put_user(host_st->st_dev, &target_st->st_dev);
         __put_user(host_st->st_ino, &target_st->st_ino);
@@ -10863,11 +10922,16 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
                 goto efault;
             }
 
+            // Catalina (10.15) readonly system volume workaround
+            char fd_path[PATH_MAX] = { '\0' };
+            bool fd_path_init = FALSE;
+
             struct dirent *de;
             struct target_dirent *tde = target_dirp;
             uint bytes_used = 0;
             uint target_reclen;
             uint name_len;
+            ino_t converted_ino;
 
             errno = 0;
             while ((de = readdir(dirp))) {
@@ -10880,7 +10944,9 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
                     break;
                 }
                 // translate from host to target dirent
-                __put_user(de->d_ino, &tde->d_ino);
+                // EDIT HERERE
+                converted_ino = catalina_ino_convert(dir_fd, fd_path, &fd_path_init, de);
+                __put_user(converted_ino, &tde->d_ino);
                 __put_user(de->d_seekoff, &tde->d_off);
                 __put_user(target_reclen, &tde->d_reclen);
                 memcpy(tde->d_name, de->d_name, name_len);
