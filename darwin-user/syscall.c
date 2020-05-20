@@ -21,13 +21,11 @@
 #include "qemu/cutils.h"
 #include "qemu/path.h"
 #include <elf.h>
-/* #include <endian.h> */
 #include <sys/_endian.h>
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <ulimit.h>
-/* #include <ucontext.h> */
 #include <sys/ucontext.h>
 #include <limits.h>
 #include <grp.h>
@@ -40,13 +38,7 @@
 #include <sys/select.h>
 #include <dirent.h> 
 #include <signal.h>
-/* #include <sys/fsuid.h> => Not Necessary? */
-/* #include <sys/personality.h> => Not Necessary? */
-/* #include <sys/prctl.h> => Not necessary for irix? */
 #include <sys/resource.h>
-/* #include <sys/swap.h> => Not necessary for irix? */
-/* #include <linux/capability.h> => not necessary for irix? */
-/* #include <linux/sockios.h> => not used at all? */
 #include <sched.h>
 #include <sys/timex.h>
 #include <sys/socket.h>
@@ -58,20 +50,12 @@
 #include <sys/sem.h>
 #include <sys/ioctl.h>
 #include <stdbool.h>
-/* #include <sys/statfs.h> not supported on macOS/darwin, convert from statvfs if possble */
+#include <sys/mount.h>
 #include <sys/statvfs.h>
 #include <time.h>
 #include <utime.h>
-/* #include <sys/sysinfo.h> => not necessary for irix? */
-/* #include <sys/signalfd.h> => not necessary for irix? */
-//#include <sys/user.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
-//#include <linux/wireless.h>
-//#include <linux/icmp.h>
-//#include <linux/icmpv6.h>
-//#include <linux/errqueue.h>
-//#include <linux/random.h>
 #include "qemu-common.h"
 #ifdef CONFIG_TIMERFD
 #include <sys/timerfd.h>
@@ -93,40 +77,13 @@
 #endif
 
 #define termios host_termios
-// #define winsize host_winsize
 #define termio host_termio
 #define sgttyb host_sgttyb /* same as target */
 #define tchars host_tchars /* same as target */
 #define ltchars host_ltchars /* same as target */
 
-//#include <linux/termios.h>
 #include <termios.h>
-//#include <linux/unistd.h>
-//#include <linux/cdrom.h>
-//#include <linux/hdreg.h>
-//#include <linux/soundcard.h>
-//#include <linux/kd.h>
-//#include <linux/mtio.h>
-//#include <linux/fs.h>
-#if defined(CONFIG_FIEMAP)
-#include <linux/fiemap.h>
-#endif
-//#include <linux/fb.h>
-//#include <linux/vt.h>
-//#include <linux/dm-ioctl.h>
-//#include <linux/reboot.h>
-//#include <linux/route.h>
-//#include <linux/filter.h>
-//#include <linux/blkpg.h>
-//#include <netpacket/packet.h>
-//#include <linux/netlink.h>
-#ifdef CONFIG_RTNETLINK
-#include <linux/rtnetlink.h>
-#include <linux/if_bridge.h>
-#endif
-//#include <linux/audit.h>
 
-//#include "linux_loop.h"
 #include "uname.h"
 #include "qemu.h"
 #include "shim_fallocate.h"
@@ -134,165 +91,15 @@
 #include "shim_gettid.h"
 
 
-// TODO: remove these clone flags, as macOS only has fork
-#ifndef CLONE_IO
-#define CLONE_IO 0x80000000     /* Clone io context */
-#endif
-
-/* We can't directly call the host clone syscall, because this will
- * badly confuse libc (breaking mutexes, for example). So we must
- * divide clone flags into:
- *  * flag combinations that look like pthread_create()
- *  * flag combinations that look like fork()
- *  * flags we can implement within QEMU itself
- *  * flags we can't support and will return an error for
- */
-/* For thread creation, all these flags must be present; for
- * fork, none must be present.
- */
-#define CLONE_THREAD_FLAGS                              \
-    (CLONE_VM | CLONE_FS | CLONE_FILES |                \
-     CLONE_SIGHAND | CLONE_THREAD | CLONE_SYSVSEM)
-
-/* These flags are ignored:
- * CLONE_DETACHED is now ignored by the kernel;
- * CLONE_IO is just an optimisation hint to the I/O scheduler
- */
-#define CLONE_IGNORED_FLAGS                     \
-    (CLONE_DETACHED | CLONE_IO)
-
-/* Flags for fork which we can implement within QEMU itself */
-#define CLONE_OPTIONAL_FORK_FLAGS               \
-    (CLONE_SETTLS | CLONE_PARENT_SETTID |       \
-     CLONE_CHILD_CLEARTID | CLONE_CHILD_SETTID)
-
-/* Flags for thread creation which we can implement within QEMU itself */
-#define CLONE_OPTIONAL_THREAD_FLAGS                             \
-    (CLONE_SETTLS | CLONE_PARENT_SETTID |                       \
-     CLONE_CHILD_CLEARTID | CLONE_CHILD_SETTID | CLONE_PARENT)
-
-#define CLONE_INVALID_FORK_FLAGS                                        \
-    (~(CSIGNAL | CLONE_OPTIONAL_FORK_FLAGS | CLONE_IGNORED_FLAGS))
-
-#define CLONE_INVALID_THREAD_FLAGS                                      \
-    (~(CSIGNAL | CLONE_THREAD_FLAGS | CLONE_OPTIONAL_THREAD_FLAGS |     \
-       CLONE_IGNORED_FLAGS))
-
-/* CLONE_VFORK is special cased early in do_fork(). The other flag bits
- * have almost all been allocated. We cannot support any of
- * CLONE_NEWNS, CLONE_NEWCGROUP, CLONE_NEWUTS, CLONE_NEWIPC,
- * CLONE_NEWUSER, CLONE_NEWPID, CLONE_NEWNET, CLONE_PTRACE, CLONE_UNTRACED.
- * The checks against the invalid thread masks above will catch these.
- * (The one remaining unallocated bit is 0x1000 which used to be CLONE_PID.)
- */
-
 //#define DEBUG
 /* Define DEBUG_ERESTARTSYS to force every syscall to be restarted
  * once. This exercises the codepaths for restart.
  */
 //#define DEBUG_ERESTARTSYS
 
-//#include <linux/msdos_fs.h>
-#define	VFAT_IOCTL_READDIR_BOTH		_IOR('r', 1, struct linux_dirent [2])
-#define	VFAT_IOCTL_READDIR_SHORT	_IOR('r', 2, struct linux_dirent [2])
-
-#undef _syscall0
-#undef _syscall1
-#undef _syscall2
-#undef _syscall3
-#undef _syscall4
-#undef _syscall5
-#undef _syscall6
-
-#define _syscall0(type,name)		\
-static inline type name (void)		\
-{					\
-    return syscall(__NR_##name);	\
-}
-
-#define _syscall1(type,name,type1,arg1)		\
-static inline type name (type1 arg1)		\
-{						\
-    return syscall(__NR_##name, arg1);	\
-}
-
-#define _syscall2(type,name,type1,arg1,type2,arg2)	\
-static inline type name (type1 arg1,type2 arg2)		\
-{							\
-    return syscall(__NR_##name, arg1, arg2);	\
-}
-
-#define _syscall3(type,name,type1,arg1,type2,arg2,type3,arg3)	\
-static inline type name (type1 arg1,type2 arg2,type3 arg3)	\
-{								\
-    return syscall(__NR_##name, arg1, arg2, arg3);		\
-}
-
-#define _syscall4(type,name,type1,arg1,type2,arg2,type3,arg3,type4,arg4)	\
-static inline type name (type1 arg1,type2 arg2,type3 arg3,type4 arg4)		\
-{										\
-    return syscall(__NR_##name, arg1, arg2, arg3, arg4);			\
-}
-
-#define _syscall5(type,name,type1,arg1,type2,arg2,type3,arg3,type4,arg4,	\
-          type5,arg5)							\
-static inline type name (type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5)\
-{										\
-    return syscall(__NR_##name, arg1, arg2, arg3, arg4, arg5);		\
-}
-
-
-#define _syscall6(type,name,type1,arg1,type2,arg2,type3,arg3,type4,arg4,	\
-          type5,arg5,type6,arg6)					\
-static inline type name (type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5,\
-                  type6 arg6)							\
-{										\
-    return syscall(__NR_##name, arg1, arg2, arg3, arg4, arg5, arg6);	\
-}
-
-
-#define __NR_sys_uname __NR_uname
-#define __NR_sys_getcwd1 __NR_getcwd
-#define __NR_sys_getdents __NR_getdents
-#define __NR_sys_getdents64 __NR_getdents64
-#define __NR_sys_getpriority __NR_getpriority
-#define __NR_sys_rt_sigqueueinfo __NR_rt_sigqueueinfo
-#define __NR_sys_rt_tgsigqueueinfo __NR_rt_tgsigqueueinfo
-#define __NR_sys_syslog __NR_syslog
-#define __NR_sys_futex __NR_futex
-#define __NR_sys_inotify_init __NR_inotify_init
-#define __NR_sys_inotify_add_watch __NR_inotify_add_watch
-#define __NR_sys_inotify_rm_watch __NR_inotify_rm_watch
-
-#if defined(__alpha__) || defined(__x86_64__) || defined(__s390x__)
-#define __NR__llseek __NR_lseek
-#endif
-
-/* Newer kernel ports have llseek() instead of _llseek() */
-#if defined(TARGET_NR_llseek) && !defined(TARGET_NR__llseek)
-#define TARGET_NR__llseek TARGET_NR_llseek
-#endif
-
-
-#if defined(TARGET_NR_getdents) && defined(__NR_getdents)
-_syscall3(int, sys_getdents, uint, fd, struct linux_dirent *, dirp, uint, count);
-#endif
-
-/* 
- * These were implemented without a syscall. Saving for now to remove later
-#if !defined(__NR_getdents) || \
-    (defined(TARGET_NR_getdents64) && defined(__NR_getdents64))
-_syscall3(int, sys_getdents64, uint, fd, struct linux_dirent64 *, dirp, uint, count);
-#endif
-#if defined(TARGET_NR__llseek) && defined(__NR_llseek)
-_syscall5(int, _llseek,  uint,  fd, ulong, hi, ulong, lo,
-          loff_t *, res, uint, wh);
-#endif
-*/
-
 
 /**
- * catalina_ino_convert:
+ * convert_catalina_ino:
  * @param fd: fd of dir that produced struct dirent `de`
  * @param fd_path: pointer to the (possibly un-initialized) path string of fd
  * @param fd_path_init: has `fdPath` been initialized
@@ -306,7 +113,7 @@ _syscall5(int, _llseek,  uint,  fd, ulong, hi, ulong, lo,
  * differs from 'dp = opendir("\"); readdir(dp)`.
  * This function attempts to convert back from the readonly ino to the stat ino
  */
-static ino_t catalina_ino_convert(
+static ino_t convert_catalina_ino(
     int fd,
     char *fd_path, 
     bool *fd_path_init,
@@ -317,8 +124,8 @@ static ino_t catalina_ino_convert(
     int ret = 0;
     bool is_catalina_ino = ((uint64_t)de->d_ino >> 32) == 0x0fffffff;
 
+    // High bits set seem to imply Catalina readonly ino
     if (is_catalina_ino) {
-        // High bits set seem to imply Catalina readonly ino
         if (!(*fd_path_init)) {
             ret = fcntl(fd, F_GETPATH, fd_path);
             if (ret != -1) { *fd_path_init = TRUE; }
@@ -344,66 +151,9 @@ static ino_t catalina_ino_convert(
         }
     }
 
-    // do not attempt to convert ino
+    // without high bits set, do not attempt to convert ino
     return de->d_ino;
 }
-
-#ifdef TARGET_NR_rt_sigqueueinfo
-_syscall3(int, sys_rt_sigqueueinfo, pid_t, pid, int, sig, siginfo_t *, uinfo)
-_syscall4(int, sys_rt_tgsigqueueinfo, pid_t, pid, pid_t, tid, int, sig,
-          siginfo_t *, uinfo)
-#endif
-#ifdef TARGET_NR_syslog
-_syscall3(int,sys_syslog,int,type,char*,bufp,int,len)
-#endif
-#if defined __NR_exit_group && defined TARGET_NR_exit_group
-_syscall1(int,exit_group,int,error_code)
-#endif
-#if defined(TARGET_NR_set_tid_address) && defined(__NR_set_tid_address)
-_syscall1(int,set_tid_address,int *,tidptr)
-#endif
-#if defined(__NR_futex)
-_syscall6(int,sys_futex,int *,uaddr,int,op,int,val,
-          const struct timespec *,timeout,int *,uaddr2,int,val3)
-#endif
-#ifdef TARGET_NR_sched_getaffinity
-#define __NR_sys_sched_getaffinity __NR_sched_getaffinity
-_syscall3(int, sys_sched_getaffinity, pid_t, pid, unsigned int, len,
-          unsigned long *, user_mask_ptr);
-#define __NR_sys_sched_setaffinity __NR_sched_setaffinity
-_syscall3(int, sys_sched_setaffinity, pid_t, pid, unsigned int, len,
-          unsigned long *, user_mask_ptr);
-#endif
-
-#ifdef TARGET_NR_getcpu
-#define __NR_sys_getcpu __NR_getcpu
-_syscall3(int, sys_getcpu, unsigned *, cpu, unsigned *, node, void *, tcache);
-#endif
-
-#ifdef TARGET_NR_reboot
-_syscall4(int, reboot, int, magic1, int, magic2, unsigned int, cmd,
-          void *, arg);
-#endif
-#ifdef TARGET_NR_capget
-_syscall2(int, capget, struct __user_cap_header_struct *, header,
-          struct __user_cap_data_struct *, data);
-_syscall2(int, capset, struct __user_cap_header_struct *, header,
-          struct __user_cap_data_struct *, data);
-#endif
-#if defined(TARGET_NR_ioprio_get) && defined(__NR_ioprio_get)
-_syscall2(int, ioprio_get, int, which, int, who)
-#endif
-#if defined(TARGET_NR_ioprio_set) && defined(__NR_ioprio_set)
-_syscall3(int, ioprio_set, int, which, int, who, int, ioprio)
-#endif
-#if defined(TARGET_NR_getrandom) && defined(__NR_getrandom)
-_syscall3(int, getrandom, void *, buf, size_t, buflen, unsigned int, flags)
-#endif
-
-#if defined(TARGET_NR_kcmp) && defined(__NR_kcmp)
-_syscall5(int, kcmp, pid_t, pid1, pid_t, pid2, int, type,
-          unsigned long, idx1, unsigned long, idx2)
-#endif
 
 static bitmask_transtbl fcntl_flags_tbl[] = {
   { TARGET_O_ACCMODE,   TARGET_O_WRONLY,    O_ACCMODE,   O_WRONLY,    },
@@ -673,38 +423,6 @@ static int sys_getcwd1(char *buf, size_t size)
 }
 #endif
 
-#ifdef TARGET_NR_utimensat
-#if defined(__NR_utimensat)
-#define __NR_sys_utimensat __NR_utimensat
-_syscall4(int,sys_utimensat,int,dirfd,const char *,pathname,
-          const struct timespec *,tsp,int,flags)
-#else
-static int sys_utimensat(int dirfd, const char *pathname,
-                         const struct timespec times[2], int flags)
-{
-    errno = ENOSYS;
-    return -1;
-}
-#endif
-#endif /* TARGET_NR_utimensat */
-
-#ifdef TARGET_NR_renameat2
-#if defined(__NR_renameat2)
-#define __NR_sys_renameat2 __NR_renameat2
-_syscall5(int, sys_renameat2, int, oldfd, const char *, old, int, newfd,
-          const char *, new, unsigned int, flags)
-#else
-static int sys_renameat2(int oldfd, const char *old,
-                         int newfd, const char *new, int flags)
-{
-    if (flags == 0) {
-        return renameat(oldfd, old, newfd, new);
-    }
-    errno = ENOSYS;
-    return -1;
-}
-#endif
-#endif /* TARGET_NR_renameat2 */
 
 #ifdef CONFIG_INOTIFY
 #include <sys/inotify.h>
@@ -742,21 +460,6 @@ static int sys_inotify_init1(int flags)
 #undef TARGET_NR_inotify_add_watch
 #undef TARGET_NR_inotify_rm_watch
 #endif /* CONFIG_INOTIFY  */
-
-#if defined(TARGET_NR_prlimit64)
-#ifndef __NR_prlimit64
-# define __NR_prlimit64 -1
-#endif
-#define __NR_sys_prlimit64 __NR_prlimit64
-/* The glibc rlimit structure may not be that used by the underlying syscall */
-struct host_rlimit64 {
-    uint64_t rlim_cur;
-    uint64_t rlim_max;
-};
-_syscall4(int, sys_prlimit64, pid_t, pid, int, resource,
-          const struct host_rlimit64 *, new_limit,
-          struct host_rlimit64 *, old_limit)
-#endif
 
 
 #if defined(TARGET_NR_timer_create)
@@ -908,135 +611,6 @@ static uint16_t host_to_target_errno_table[ERRNO_TABLE_SIZE] = {
     [ETIME]           = TARGET_ETIME,
 };
 
-/* old table for linux; delete eventually...
-static uint16_t host_to_target_errno_table[ERRNO_TABLE_SIZE] = {
-    [EAGAIN]          = TARGET_EAGAIN,
-    [EIDRM]           = TARGET_EIDRM,
-    [ECHRNG]          = TARGET_ECHRNG,
-    [EL2NSYNC]        = TARGET_EL2NSYNC,
-    [EL3HLT]          = TARGET_EL3HLT,
-    [EL3RST]          = TARGET_EL3RST,
-    [ELNRNG]          = TARGET_ELNRNG,
-    [EUNATCH]         = TARGET_EUNATCH,
-    [ENOCSI]          = TARGET_ENOCSI,
-    [EL2HLT]          = TARGET_EL2HLT,
-    [EDEADLK]         = TARGET_EDEADLK,
-    [ENOLCK]          = TARGET_ENOLCK,
-    [EBADE]           = TARGET_EBADE,
-    [EBADR]           = TARGET_EBADR,
-    [EXFULL]          = TARGET_EXFULL,
-    [ENOANO]          = TARGET_ENOANO,
-    [EBADRQC]         = TARGET_EBADRQC,
-    [EBADSLT]         = TARGET_EBADSLT,
-    [EBFONT]          = TARGET_EBFONT,
-    [ENOSTR]          = TARGET_ENOSTR,
-    [ENODATA]         = TARGET_ENODATA,
-    [ETIME]           = TARGET_ETIME,
-    [ENOSR]           = TARGET_ENOSR,
-    [ENONET]          = TARGET_ENONET,
-    [ENOPKG]          = TARGET_ENOPKG,
-    [EREMOTE]         = TARGET_EREMOTE,
-    [ENOLINK]         = TARGET_ENOLINK,
-    [EADV]            = TARGET_EADV,
-    [ESRMNT]          = TARGET_ESRMNT,
-    [ECOMM]           = TARGET_ECOMM,
-    [EPROTO]          = TARGET_EPROTO,
-#if defined EDOTDOT && defined TARGET_EDOTDOT
-    [EDOTDOT]         = TARGET_EDOTDOT,
-#endif
-    [EMULTIHOP]       = TARGET_EMULTIHOP,
-    [EBADMSG]         = TARGET_EBADMSG,
-    [ENAMETOOLONG]    = TARGET_ENAMETOOLONG,
-    [EOVERFLOW]       = TARGET_EOVERFLOW,
-    [ENOTUNIQ]        = TARGET_ENOTUNIQ,
-    [EBADFD]          = TARGET_EBADFD,
-    [EREMCHG]         = TARGET_EREMCHG,
-    [ELIBACC]         = TARGET_ELIBACC,
-    [ELIBBAD]         = TARGET_ELIBBAD,
-    [ELIBSCN]         = TARGET_ELIBSCN,
-    [ELIBMAX]         = TARGET_ELIBMAX,
-    [ELIBEXEC]        = TARGET_ELIBEXEC,
-    [EILSEQ]          = TARGET_EILSEQ,
-    [ENOSYS]          = TARGET_ENOSYS,
-    [ELOOP]           = TARGET_ELOOP,
-    [ERESTART]        = TARGET_ERESTART,
-    [ESTRPIPE]        = TARGET_ESTRPIPE,
-    [ENOTEMPTY]       = TARGET_ENOTEMPTY,
-    [EUSERS]          = TARGET_EUSERS,
-    [ENOTSOCK]        = TARGET_ENOTSOCK,
-    [EDESTADDRREQ]    = TARGET_EDESTADDRREQ,
-    [EMSGSIZE]        = TARGET_EMSGSIZE,
-    [EPROTOTYPE]      = TARGET_EPROTOTYPE,
-    [ENOPROTOOPT]     = TARGET_ENOPROTOOPT,
-    [EPROTONOSUPPORT] = TARGET_EPROTONOSUPPORT,
-    [ESOCKTNOSUPPORT] = TARGET_ESOCKTNOSUPPORT,
-    [EOPNOTSUPP]      = TARGET_EOPNOTSUPP,
-    [EPFNOSUPPORT]    = TARGET_EPFNOSUPPORT,
-    [EAFNOSUPPORT]    = TARGET_EAFNOSUPPORT,
-    [EADDRINUSE]      = TARGET_EADDRINUSE,
-    [EADDRNOTAVAIL]   = TARGET_EADDRNOTAVAIL,
-    [ENETDOWN]        = TARGET_ENETDOWN,
-    [ENETUNREACH]     = TARGET_ENETUNREACH,
-    [ENETRESET]       = TARGET_ENETRESET,
-    [ECONNABORTED]    = TARGET_ECONNABORTED,
-    [ECONNRESET]      = TARGET_ECONNRESET,
-    [ENOBUFS]         = TARGET_ENOBUFS,
-    [EISCONN]         = TARGET_EISCONN,
-    [ENOTCONN]        = TARGET_ENOTCONN,
-    [EUCLEAN]         = TARGET_EUCLEAN,
-    [ENOTNAM]         = TARGET_ENOTNAM,
-    [ENAVAIL]         = TARGET_ENAVAIL,
-    [EISNAM]          = TARGET_EISNAM,
-    [EREMOTEIO]       = TARGET_EREMOTEIO,
-#if defined EDQUOT && defined TARGET_EDQUOT
-    [EDQUOT]          = TARGET_EDQUOT,
-#endif
-    [ESHUTDOWN]       = TARGET_ESHUTDOWN,
-    [ETOOMANYREFS]    = TARGET_ETOOMANYREFS,
-    [ETIMEDOUT]       = TARGET_ETIMEDOUT,
-    [ECONNREFUSED]    = TARGET_ECONNREFUSED,
-    [EHOSTDOWN]       = TARGET_EHOSTDOWN,
-    [EHOSTUNREACH]    = TARGET_EHOSTUNREACH,
-    [EALREADY]        = TARGET_EALREADY,
-    [EINPROGRESS]     = TARGET_EINPROGRESS,
-    [ESTALE]          = TARGET_ESTALE,
-    [ECANCELED]       = TARGET_ECANCELED,
-#if defined ENOMEDIUM && defined TARGET_ENOMEDIUM
-    [ENOMEDIUM]       = TARGET_ENOMEDIUM,
-#endif
-#if defined EMEDIUMTYPE && defined TARGET_EMEDIUMTYPE
-    [EMEDIUMTYPE]     = TARGET_EMEDIUMTYPE,
-#endif
-#if defined ENOKEY && defined TARGET_ENOKEY
-    [ENOKEY]          = TARGET_ENOKEY,
-#endif
-#if defined EKEYEXPIRED && defined TARGET_EKEYEXPIRED
-    [EKEYEXPIRED]     = TARGET_EKEYEXPIRED,
-#endif
-#if defined EKEYREVOKED && defined TARGET_EKEYREVOKED
-    [EKEYREVOKED]     = TARGET_EKEYREVOKED,
-#endif
-#if defined EKEYREJECTED && defined TARGET_EKEYREJECTED
-    [EKEYREJECTED]    = TARGET_EKEYREJECTED,
-#endif
-#if defined EOWNERDEAD && defined TARGET_EOWNERDEAD
-    [EOWNERDEAD]      = TARGET_EOWNERDEAD,
-#endif
-#if defined ENOTRECOVERABLE && defined TARGET_ENOTRECOVERABLE
-    [ENOTRECOVERABLE] = TARGET_ENOTRECOVERABLE,
-#endif
-#ifdef ENOMSG
-    [ENOMSG]          = TARGET_ENOMSG,
-#endif
-#if defined ERKFILL && defined TARGET_ERFKILL
-    [ERFKILL]         = TARGET_ERFKILL,
-#endif
-#if defined EHWPOISON && defined TARGET_EHWPOISON
-    [EHWPOISON]       = TARGET_EHWPOISON,
-#endif
-};
-*/
-
 static inline int host_to_target_errno(int err)
 {
     if (err >= 0 && err < ERRNO_TABLE_SIZE &&
@@ -1082,161 +656,6 @@ const char *target_strerror(int err)
     }
     return strerror(target_to_host_errno(err));
 }
-
-#define safe_syscall0(type, name) \
-static inline type safe_##name(void) \
-{ \
-    return safe_syscall(__NR_##name); \
-}
-
-#define safe_syscall1(type, name, type1, arg1) \
-static inline type safe_##name(type1 arg1) \
-{ \
-    return safe_syscall(__NR_##name, arg1); \
-}
-
-#define safe_syscall2(type, name, type1, arg1, type2, arg2) \
-static inline type safe_##name(type1 arg1, type2 arg2) \
-{ \
-    return safe_syscall(__NR_##name, arg1, arg2); \
-}
-
-#define safe_syscall3(type, name, type1, arg1, type2, arg2, type3, arg3) \
-static inline type safe_##name(type1 arg1, type2 arg2, type3 arg3) \
-{ \
-    return safe_syscall(__NR_##name, arg1, arg2, arg3); \
-}
-
-#define safe_syscall4(type, name, type1, arg1, type2, arg2, type3, arg3, \
-    type4, arg4) \
-static inline type safe_##name(type1 arg1, type2 arg2, type3 arg3, type4 arg4) \
-{ \
-    return safe_syscall(__NR_##name, arg1, arg2, arg3, arg4); \
-}
-
-#define safe_syscall5(type, name, type1, arg1, type2, arg2, type3, arg3, \
-    type4, arg4, type5, arg5) \
-static inline type safe_##name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, \
-    type5 arg5) \
-{ \
-    return safe_syscall(__NR_##name, arg1, arg2, arg3, arg4, arg5); \
-}
-
-#define safe_syscall6(type, name, type1, arg1, type2, arg2, type3, arg3, \
-    type4, arg4, type5, arg5, type6, arg6) \
-static inline type safe_##name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, \
-    type5 arg5, type6 arg6) \
-{ \
-    return safe_syscall(__NR_##name, arg1, arg2, arg3, arg4, arg5, arg6); \
-}
-
-/* Replaced these syscalls with the C function */
-// safe_syscall3(ssize_t, read, int, fd, void *, buff, size_t, count)
-// safe_syscall3(ssize_t, write, int, fd, const void *, buff, size_t, count)
-// safe_syscall4(int, openat, int, dirfd, const char *, pathname, \
-//               int, flags, mode_t, mode)
-// safe_syscall4(pid_t, wait4, pid_t, pid, int *, status, int, options, \
-//               struct rusage *, rusage)
-// safe_syscall5(int, waitid, idtype_t, idtype, id_t, id, siginfo_t *, infop, \
-//               int, options, struct rusage *, rusage)
-// safe_syscall3(int, execve, const char *, filename, char **, argv, char **, envp)
-// safe_syscall6(int, pselect6, int, nfds, fd_set *, readfds, fd_set *, writefds, \
-//               fd_set *, exceptfds, struct timespec *, timeout, void *, sig)
-// safe_syscall5(int, ppoll, struct pollfd *, ufds, unsigned int, nfds,
-//               struct timespec *, tsp, const sigset_t *, sigmask,
-//               size_t, sigsetsize)
-// safe_syscall6(int, epoll_pwait, int, epfd, struct epoll_event *, events,
-//               int, maxevents, int, timeout, const sigset_t *, sigmask,
-//               size_t, sigsetsize)
-// safe_syscall6(int,futex,int *,uaddr,int,op,int,val, \
-//               const struct timespec *,timeout,int *,uaddr2,int,val3)
-// safe_syscall2(int, rt_sigsuspend, sigset_t *, newset, size_t, sigsetsize)
-// safe_syscall2(int, kill, pid_t, pid, int, sig)
-// safe_syscall2(int, tkill, int, tid, int, sig)
-// safe_syscall3(int, tgkill, int, tgid, int, pid, int, sig)
-// safe_syscall3(ssize_t, readv, int, fd, const struct iovec *, iov, int, iovcnt)
-// safe_syscall3(ssize_t, writev, int, fd, const struct iovec *, iov, int, iovcnt)
-// safe_syscall5(ssize_t, preadv, int, fd, const struct iovec *, iov, int, iovcnt,
-//               unsigned long, pos_l, unsigned long, pos_h)
-// safe_syscall5(ssize_t, pwritev, int, fd, const struct iovec *, iov, int, iovcnt,
-//               unsigned long, pos_l, unsigned long, pos_h)
-// safe_syscall3(int, connect, int, fd, const struct sockaddr *, addr,
-//               socklen_t, addrlen)
-// safe_syscall6(ssize_t, sendto, int, fd, const void *, buf, size_t, len,
-//               int, flags, const struct sockaddr *, addr, socklen_t, addrlen)
-// safe_syscall6(ssize_t, recvfrom, int, fd, void *, buf, size_t, len,
-//               int, flags, struct sockaddr *, addr, socklen_t *, addrlen)
-// safe_syscall3(ssize_t, sendmsg, int, fd, const struct msghdr *, msg, int, flags)
-// safe_syscall3(ssize_t, recvmsg, int, fd, struct msghdr *, msg, int, flags)
-// safe_syscall2(int, flock, int, fd, int, operation)
-// safe_syscall4(int, rt_sigtimedwait, const sigset_t *, these, siginfo_t *, uinfo,
-//               const struct timespec *, uts, size_t, sigsetsize)
-// safe_syscall4(int, accept4, int, fd, struct sockaddr *, addr, socklen_t *, len,
-//               int, flags)
-// safe_syscall2(int, nanosleep, const struct timespec *, req,
-//               struct timespec *, rem)
-#ifdef TARGET_NR_clock_nanosleep
-safe_syscall4(int, clock_nanosleep, const clockid_t, clock, int, flags,
-              const struct timespec *, req, struct timespec *, rem)
-#endif
-#ifdef __NR_msgsnd
-safe_syscall4(int, msgsnd, int, msgid, const void *, msgp, size_t, sz,
-              int, flags)
-safe_syscall5(int, msgrcv, int, msgid, void *, msgp, size_t, sz,
-              long, msgtype, int, flags)
-safe_syscall4(int, semtimedop, int, semid, struct sembuf *, tsops,
-              unsigned, nsops, const struct timespec *, timeout)
-#else
-/* This host kernel architecture uses a single ipc syscall; fake up
- * wrappers for the sub-operations to hide this implementation detail.
- * Annoyingly we can't include linux/ipc.h to get the constant definitions
- * for the call parameter because some structs in there conflict with the
- * sys/ipc.h ones. So we just define them here, and rely on them being
- * the same for all host architectures.
- */
-#define Q_SEMTIMEDOP 4
-#define Q_MSGSND 11
-#define Q_MSGRCV 12
-#define Q_IPCCALL(VERSION, OP) ((VERSION) << 16 | (OP))
-
-// safe_syscall6(int, ipc, int, call, long, first, long, second, long, third,
-//               void *, ptr, long, fifth)
-// static int safe_msgsnd(int msgid, const void *msgp, size_t sz, int flags)
-// {
-//     return safe_ipc(Q_IPCCALL(0, Q_MSGSND), msgid, sz, flags, (void *)msgp, 0);
-// }
-// static int safe_msgrcv(int msgid, void *msgp, size_t sz, long type, int flags)
-// {
-//     return safe_ipc(Q_IPCCALL(1, Q_MSGRCV), msgid, sz, flags, msgp, type);
-// }
-// static int safe_semtimedop(int semid, struct sembuf *tsops, unsigned nsops,
-//                            const struct timespec *timeout)
-// {
-//     return safe_ipc(Q_IPCCALL(0, Q_SEMTIMEDOP), semid, nsops, 0, tsops,
-//                     (long)timeout);
-// }
-#endif
-#if defined(TARGET_NR_mq_open) && defined(__NR_mq_open)
-safe_syscall5(int, mq_timedsend, int, mqdes, const char *, msg_ptr,
-              size_t, len, unsigned, prio, const struct timespec *, timeout)
-safe_syscall5(int, mq_timedreceive, int, mqdes, char *, msg_ptr,
-              size_t, len, unsigned *, prio, const struct timespec *, timeout)
-#endif
-/* We do ioctl like this rather than via safe_syscall3 to preserve the
- * "third argument might be integer or pointer or not present" behaviour of
- * the libc function.
- */
-#define safe_ioctl(...) safe_syscall(__NR_ioctl, __VA_ARGS__)
-/* Similarly for fcntl. Note that callers must always:
- *  pass the F_GETLK64 etc constants rather than the unsuffixed F_GETLK
- *  use the flock64 struct rather than unsuffixed flock
- * This will then work and use a 64-bit offset for both 32-bit and 64-bit hosts.
- */
-#ifdef __NR_fcntl64
-#define safe_fcntl(...) safe_syscall(__NR_fcntl64, __VA_ARGS__)
-#else
-#define safe_fcntl(...) safe_syscall(__NR_fcntl, __VA_ARGS__)
-#endif
 
 static inline int host_to_target_sock_type(int host_type)
 {
@@ -1705,6 +1124,7 @@ static inline abi_long copy_to_user_timeval(abi_ulong target_tv_addr,
     return 0;
 }
 
+#ifdef TARGET_NR_settimeofday
 static inline abi_long copy_from_user_timezone(struct timezone *tz,
                                                abi_ulong target_tz_addr)
 {
@@ -1721,6 +1141,7 @@ static inline abi_long copy_from_user_timezone(struct timezone *tz,
 
     return 0;
 }
+#endif
 
 #if defined(TARGET_NR_mq_open) && defined(__NR_mq_open)
 #include <mqueue.h>
@@ -1797,8 +1218,6 @@ static abi_long do_select(int n,
     }
 
     ret = get_errno(select(n, rfds_ptr, wfds_ptr, efds_ptr, tv_ptr));
-    // ret = get_errno(safe_pselect6(n, rfds_ptr, wfds_ptr, efds_ptr,
-    //                               ts_ptr, NULL));
 
     if (!is_error(ret)) {
         if (rfd_addr && copy_to_user_fdset(rfd_addr, &rfds, n))
@@ -1847,8 +1266,8 @@ static abi_long do_old_select(abi_ulong arg1)
 
     return do_select(nsel, inp, outp, exp, tvp);
 }
-#endif
-#endif
+#endif /* TARGET_WANT_OLD_SYS_SELECT */
+#endif /* defined(TARGET_NR_select) || defined(TARGET_NR__newselect) */
 
 static abi_long do_pipe2(int host_pipe[], int flags)
 {
@@ -1893,6 +1312,7 @@ static abi_long do_pipe(void *cpu_env, abi_ulong pipedes,
     return get_errno(ret);
 }
 
+#ifdef SOL_IP
 static inline abi_long target_to_host_ip_mreq(struct ip_mreqn *mreqn,
                                               abi_ulong target_addr,
                                               socklen_t len)
@@ -1910,6 +1330,7 @@ static inline abi_long target_to_host_ip_mreq(struct ip_mreqn *mreqn,
 
     return 0;
 }
+#endif
 
 static inline abi_long target_to_host_sockaddr(int fd, struct sockaddr *addr,
                                                abi_ulong target_addr,
@@ -1948,7 +1369,8 @@ static inline abi_long target_to_host_sockaddr(int fd, struct sockaddr *addr,
             len = unix_maxlen;
     }
 
-    /* These are not relevant for Irix?
+    /* These are not relevant for Irix? */
+    #ifndef TARGET_ABI_IRIX
     memcpy(addr, target_saddr, len);
     addr->sa_family = sa_family;
     if (sa_family == AF_NETLINK) {
@@ -1964,7 +1386,7 @@ static inline abi_long target_to_host_sockaddr(int fd, struct sockaddr *addr,
         __get_user(lladdr->sll_ifindex, &lladdr->sll_ifindex);
         __get_user(lladdr->sll_hatype, &lladdr->sll_hatype);
     }
-    */
+    #endif /* TARGET_ABI_IRIX */
     unlock_user(target_saddr, target_addr, 0);
 
     return 0;
@@ -1989,7 +1411,8 @@ static inline abi_long host_to_target_sockaddr(abi_ulong target_addr,
         sizeof(target_saddr->sa_family)) {
         __put_user(addr->sa_family, &target_saddr->sa_family);
     }
-    /* Not on IRIX...?
+    /* These are not relevant for Irix? */
+    #ifndef TARGET_ABI_IRIX
     if (addr->sa_family == AF_NETLINK && len >= sizeof(struct sockaddr_nl)) {
         struct sockaddr_nl *target_nl = (struct sockaddr_nl *)target_saddr;
         __put_user(target_nl->nl_pid, &target_nl->nl_pid);
@@ -1999,7 +1422,7 @@ static inline abi_long host_to_target_sockaddr(abi_ulong target_addr,
         __put_user(target_ll->sll_ifindex, &target_ll->sll_ifindex);
         __put_user(target_ll->sll_hatype, &target_ll->sll_hatype);
     } else
-    */
+    #endif
     
     if (addr->sa_family == AF_INET6 &&
                len >= sizeof(struct target_sockaddr_in6)) {
@@ -2216,7 +1639,8 @@ static inline abi_long host_to_target_cmsg(struct target_msghdr *target_msgh,
                 goto unimplemented;
             }
             break;
-        /* TODO: Not in IRIX?
+        /* TODO: Not in IRIX? */
+        #ifndef TARGET_ABI_IRIX
         case SOL_IP:
             switch (cmsg->cmsg_type) {
             case IP_TTL:
@@ -2304,7 +1728,7 @@ static inline abi_long host_to_target_cmsg(struct target_msghdr *target_msgh,
                 goto unimplemented;
             }
             break;
-        */
+        #endif /* TARGET_ABI_IRIX */
         default:
         unimplemented:
             gemu_log("Unsupported ancillary data: %d/%d\n",
@@ -3167,9 +2591,7 @@ static abi_long target_to_host_nlmsg_route(struct nlmsghdr *nlh, size_t len)
 {
     return target_to_host_for_each_nlmsg(nlh, len, target_to_host_data_route);
 }
-#endif /* CONFIG_RTNETLINK */
 
-/* NOTE: not needed?
 static abi_long host_to_target_data_audit(struct nlmsghdr *nlh)
 {
     switch (nlh->nlmsg_type) {
@@ -3206,7 +2628,8 @@ static abi_long target_to_host_nlmsg_audit(struct nlmsghdr *nlh, size_t len)
 {
     return target_to_host_for_each_nlmsg(nlh, len, target_to_host_data_audit);
 }
-*/
+
+#endif /* CONFIG_RTNETLINK */
 
 /* do_setsockopt() Must return target values and target errnos. */
 static abi_long do_setsockopt(int sockfd, int level, int optname,
@@ -3243,10 +2666,11 @@ static abi_long do_setsockopt(int sockfd, int level, int optname,
         case TARGET_SO_SNDTIMEO:
             optname = SO_SNDTIMEO;
             goto set_timeout;
-        /* Don't seem to be in irix socket.h from indy?
+        /* Don't seem to be in irix socket.h from indy? */
+        #ifndef TARGET_ABI_IRIX
         case TARGET_SO_ATTACH_FILTER:
         case TARGET_SO_BINDTODEVICE:
-        */
+        #endif
         /* Options with 'int' argument.  */
         case TARGET_SO_DEBUG:
             optname = SO_DEBUG;
@@ -3288,7 +2712,8 @@ static abi_long do_setsockopt(int sockfd, int level, int optname,
         case TARGET_SO_RCVLOWAT:
             optname = SO_RCVLOWAT;
             break;
-        /* Don't seem to be in irix socket.h from indy?
+        /* Don't seem to be in irix socket.h from indy? */
+        #ifndef TARGET_ABI_IRIX
         case TARGET_SO_SNDBUFFORCE:
         case TARGET_SO_RCVBUFFORCE:
         case TARGET_SO_NO_CHECK:
@@ -3296,7 +2721,7 @@ static abi_long do_setsockopt(int sockfd, int level, int optname,
         case TARGET_SO_BSDCOMPAT:
         case TARGET_SO_PASSCRED:
         case TARGET_SO_PASSSEC:
-        */
+        #endif
         default:
             goto unimplemented;
         }
@@ -3586,6 +3011,8 @@ static int sock_flags_fixup(int fd, int target_type)
     return fd;
 }
 
+/* SOCK_PACKET obsolete case */
+#ifdef SOCK_PACKET
 static abi_long packet_target_to_host_sockaddr(void *host_addr,
                                                abi_ulong target_addr,
                                                socklen_t len)
@@ -3609,6 +3036,7 @@ static abi_long packet_target_to_host_sockaddr(void *host_addr,
 static TargetFdTrans target_packet_trans = {
     .target_to_host_addr = packet_target_to_host_sockaddr,
 };
+#endif
 
 #ifdef CONFIG_RTNETLINK
 static abi_long netlink_route_target_to_host(void *buf, size_t len)
@@ -3639,9 +3067,7 @@ static TargetFdTrans target_netlink_route_trans = {
     .target_to_host_data = netlink_route_target_to_host,
     .host_to_target_data = netlink_route_host_to_target,
 };
-#endif /* CONFIG_RTNETLINK */
 
-/* NOTE: not needed ? 
 static abi_long netlink_audit_target_to_host(void *buf, size_t len)
 {
     abi_long ret;
@@ -3670,7 +3096,7 @@ static TargetFdTrans target_netlink_audit_trans = {
     .target_to_host_data = netlink_audit_target_to_host,
     .host_to_target_data = netlink_audit_host_to_target,
 };
-*/
+#endif /* CONFIG_RTNETLINK */
 
 /* do_socket() Must return target values and target errnos. */
 static abi_long do_socket(int domain, int type, int protocol)
@@ -3899,6 +3325,7 @@ static abi_long do_sendrecvmmsg(int fd, abi_ulong target_msgvec,
 }
 #endif
 
+#ifdef TARGET_NR_accept4
 // No accept4 on macOS
 /* do_accept4() Must return target values and target errnos. */
 // static abi_long do_accept4(int fd, abi_ulong target_addr,
@@ -3936,6 +3363,7 @@ static abi_long do_sendrecvmmsg(int fd, abi_ulong target_msgvec,
 //     }
 //     return ret;
 // }
+#endif
 
 /* do_accept() Must return target values and target errnos. */
 static abi_long do_accept(int fd, abi_ulong target_addr,
@@ -6419,6 +5847,8 @@ abi_long do_arch_prctl(CPUX86State *env, int code, abi_ulong addr)
 
 #define NEW_STACK_SIZE 0x40000
 
+// Linux clone
+#ifdef CLONE_VM
 
 static pthread_mutex_t clone_lock = PTHREAD_MUTEX_INITIALIZER;
 typedef struct {
@@ -6469,6 +5899,7 @@ static void *clone_func(void *arg)
     /* never exits */
     return NULL;
 }
+#endif /* CLONE_VM */
 
 /** Simplified function that only deals with `fork`, 
  * not with Linux `clone`.
@@ -6954,10 +6385,12 @@ static inline int low2highgid(int gid)
 {
     return gid;
 }
+#ifdef TARGET_NR_getgroups
 static inline int tswapid(int id)
 {
     return tswap32(id);
 }
+#endif
 
 #define put_user_id(x, gaddr) put_user_u32(x, gaddr)
 
@@ -10945,7 +10378,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
                 }
                 // translate from host to target dirent
                 // EDIT HERERE
-                converted_ino = catalina_ino_convert(dir_fd, fd_path, &fd_path_init, de);
+                converted_ino = convert_catalina_ino(dir_fd, fd_path, &fd_path_init, de);
                 __put_user(converted_ino, &tde->d_ino);
                 __put_user(de->d_seekoff, &tde->d_off);
                 __put_user(target_reclen, &tde->d_reclen);

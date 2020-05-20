@@ -1,6 +1,5 @@
 obj-y = main.o syscall.o strace.o mmap.o signal.o \
 	elfload.o linuxload.o uaccess.o uname.o \
-	safe-syscall.o \
 	shim_fallocate.o shim_gettid.o shim_timers.o
 
 obj-$(TARGET_HAS_BFLT) += flatload.o
