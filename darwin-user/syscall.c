@@ -10377,7 +10377,6 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
                     break;
                 }
                 // translate from host to target dirent
-                // EDIT HERERE
                 converted_ino = convert_catalina_ino(dir_fd, fd_path, &fd_path_init, de);
                 __put_user(converted_ino, &tde->d_ino);
                 __put_user(de->d_seekoff, &tde->d_off);
