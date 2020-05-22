@@ -25,7 +25,11 @@
 
 #ifdef TARGET_ABI_IRIX
 /* argh, ugly! need TaskState here to access PRDA storage */
+#ifdef CONFIG_DARWIN_USER
+#include <darwin-user/qemu.h>
+#else
 #include <linux-user/qemu.h>
+#endif
 
 #define DEBUG(x)    //x
 

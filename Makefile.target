@@ -130,6 +130,20 @@ obj-y += gdbstub.o
 endif #CONFIG_BSD_USER
 
 #########################################################
+# macOS user emulator target
+
+ifdef CONFIG_DARWIN_USER
+
+QEMU_CFLAGS+=-I$(SRC_PATH)/darwin-user/$(TARGET_ABI_DIR) \
+             -I$(SRC_PATH)/darwin-user/host/$(ARCH) \
+             -I$(SRC_PATH)/darwin-user
+
+obj-y += darwin-user/
+obj-y += gdbstub.o thunk.o
+
+endif #CONFIG_DARWIN_USER
+
+#########################################################
 # System emulator target
 ifdef CONFIG_SOFTMMU
 obj-y += arch_init.o cpus.o monitor.o gdbstub.o balloon.o ioport.o numa.o

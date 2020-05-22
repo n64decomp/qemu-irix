@@ -249,6 +249,12 @@ supported_target() {
                 return 1
             fi
             ;;
+        *-darwin-user)
+            if test "$darwin" != "yes"; then
+                print_error "Target '$target' is only available on a Darwin host"
+                return 1
+            fi
+            ;;
         *)
             print_error "Invalid target name '$target'"
             return 1
@@ -390,6 +396,7 @@ cocoa="no"
 softmmu="yes"
 linux_user="no"
 bsd_user="no"
+darwin_user="no"
 blobs="yes"
 pkgversion=""
 pie=""
@@ -766,6 +773,7 @@ OpenBSD)
 Darwin)
   bsd="yes"
   darwin="yes"
+  darwin_user="yes"
   hax="yes"
   hvf="yes"
   LDFLAGS_SHARED="-bundle -undefined dynamic_lookup"
@@ -1119,6 +1127,7 @@ for opt do
   --disable-user)
       linux_user="no" ;
       bsd_user="no" ;
+      darwin_user="no" ;
   ;;
   --enable-user) ;;
   --disable-linux-user) linux_user="no"
@@ -1128,6 +1137,10 @@ for opt do
   --disable-bsd-user) bsd_user="no"
   ;;
   --enable-bsd-user) bsd_user="yes"
+  ;;
+  --disable-darwin-user) darwin_user="no"
+  ;;
+  --enable-darwin-user) darwin_user="yes"
   ;;
   --enable-pie) pie="yes"
   ;;
@@ -1439,6 +1452,7 @@ QEMU_CFLAGS="$CPU_CFLAGS $QEMU_CFLAGS"
 if [ "$ARCH" = "unknown" ]; then
   bsd_user="no"
   linux_user="no"
+  darwin_user="no"
 fi
 
 default_target_list=""
@@ -1454,6 +1468,10 @@ fi
 if [ "$bsd_user" = "yes" ]; then
     mak_wilds="${mak_wilds} $source_path/default-configs/*-bsd-user.mak"
 fi
+if [ "$darwin_user" = "yes" ]; then
+    mak_wilds="${mak_wilds} $source_path/default-configs/*-darwin-user.mak"
+fi
+
 
 for config in $mak_wilds; do
     default_target_list="${default_target_list} $(basename "$config" .mak)"
@@ -1548,6 +1566,7 @@ disabled with --disable-FEATURE, default is enabled if available:
   user            supported user emulation targets
   linux-user      all linux usermode emulation targets
   bsd-user        all BSD usermode emulation targets
+  darwin-user     all MacOS usermode emulation targets
   docs            build documentation
   guest-agent     build the QEMU Guest Agent
   guest-agent-msi build guest agent Windows MSI installation package
@@ -5577,7 +5596,7 @@ if test "$cpu" = "s390x" ; then
 fi
 
 # Probe for the need for relocating the user-only binary.
-if ( [ "$linux_user" = yes ] || [ "$bsd_user" = yes ] ) && [ "$pie" = no ]; then
+if ( [ "$linux_user" = yes ] || [ "$bsd_user" = yes ] || [ "$darwin_user" = yes ] ) && [ "$pie" = no ]; then
   textseg_addr=
   case "$cpu" in
     arm | i386 | ppc* | s390* | sparc* | x86_64 | x32)
@@ -5590,31 +5609,53 @@ if ( [ "$linux_user" = yes ] || [ "$bsd_user" = yes ] ) && [ "$pie" = no ]; then
       textseg_addr=0x60000000
       ;;
   esac
+
   if [ -n "$textseg_addr" ]; then
     cat > $TMPC <<EOF
     int main(void) { return 0; }
 EOF
-    textseg_ldflags="-Wl,-Ttext-segment=$textseg_addr"
-    if ! compile_prog "" "$textseg_ldflags"; then
-      # In case ld does not support -Ttext-segment, edit the default linker
-      # script via sed to set the .text start addr.  This is needed on FreeBSD
-      # at least.
-      if ! $ld --verbose >/dev/null 2>&1; then
-        error_exit \
-            "We need to link the QEMU user mode binaries at a" \
-            "specific text address. Unfortunately your linker" \
-            "doesn't support either the -Ttext-segment option or" \
-            "printing the default linker script with --verbose." \
-            "If you don't want the user mode binaries, pass the" \
-            "--disable-user option to configure."
-      fi
+    # 64bit macOS reserves 4GB for page zero to catch truncated pointer to int casts.
+    # Follow suggested Wine configuration from:
+    # https://stackoverflow.com/questions/46916112/osx-ld-why-does-pagezero-size-default-to-4gb-on-64b-osx
+    if [ "$darwin_user" = yes ] ; then
+      pz_size_flag=",-pagezero_size,0x1000"
+    else
+      pz_size_flag=""
+    fi
 
+    # Check three different sets of ld flags:
+    #   default_... for standard gnu ld (Linux)
+    #   clang_... for llvm clang
+    #   macos_... for macOS built-in ld
+    # If none of the above options are supported, edit the default linker
+    # script via sed to set the .text start addr.  This is needed on FreeBSD
+    # at least.
+    default_ldflags="-Wl,-Ttext-segment=$textseg_addr"
+    clang_ldflags="-Wl,-image-base,${textseg_addr}${pz_size_flag}"
+    macos_ldflags="-Wl,-image_base,${textseg_addr}${pz_size_flag}"
+
+    if compile_prog "" "$default_ldflags"; then
+      textseg_ldflags="$default_ldflags"
+    elif compile_prog "" "$clang_ldflags"; then 
+      textseg_ldflags="$clang_ldflags"
+    elif compile_prog "" "$macos_ldflags"; then
+      textseg_ldflags="$macos_ldflags"
+    elif $ld --verbose >/dev/null 2>&1; then 
       $ld --verbose | sed \
         -e '1,/==================================================/d' \
         -e '/==================================================/,$d' \
         -e "s/[.] = [0-9a-fx]* [+] SIZEOF_HEADERS/. = $textseg_addr + SIZEOF_HEADERS/" \
         -e "s/__executable_start = [0-9a-fx]*/__executable_start = $textseg_addr/" > config-host.ld
       textseg_ldflags="-Wl,-T../config-host.ld"
+    else
+      error_exit \
+          "We need to link the QEMU user mode binaries at a" \
+          "specific text address. Unfortunately your linker" \
+          "doesn't support either the -Ttext-segment option," \
+          "-image_base, -image-base, or printing the default" \
+          "linker script with --verbose." \
+          "If you don't want the user mode binaries, pass the" \
+          "--disable-user option to configure."
     fi
   fi
 fi
@@ -6677,6 +6718,7 @@ target_softmmu="no"
 target_user_only="no"
 target_linux_user="no"
 target_bsd_user="no"
+target_darwin_user="no"
 case "$target" in
   ${target_name}-softmmu)
     target_softmmu="yes"
@@ -6688,6 +6730,10 @@ case "$target" in
   ${target_name}-bsd-user)
     target_user_only="yes"
     target_bsd_user="yes"
+    ;;
+  ${target_name}-darwin-user)
+    target_user_only="yes"
+    target_darwin_user="yes"
     ;;
   *)
     error_exit "Target '$target' not recognised"
@@ -6936,6 +6982,9 @@ fi
 if test "$target_linux_user" = "yes" ; then
   echo "CONFIG_LINUX_USER=y" >> $config_target_mak
 fi
+if test "$target_darwin_user" = "yes" ; then
+  echo "CONFIG_DARWIN_USER=y" >> $config_target_mak
+fi
 list=""
 if test ! -z "$gdb_xml_files" ; then
   for x in $gdb_xml_files; do
@@ -7050,7 +7099,7 @@ if test "$gprof" = "yes" ; then
   fi
 fi
 
-if test "$target_linux_user" = "yes" -o "$target_bsd_user" = "yes" ; then
+if test "$target_linux_user" = "yes" -o "$target_bsd_user" = "yes" -o "$target_darwin_user" = "yes" ; then
   ldflags="$ldflags $textseg_ldflags"
 fi
 

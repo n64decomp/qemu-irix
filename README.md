@@ -1,14 +1,30 @@
 This QEMU patch introduces irix/solaris userland emulation. It currently runs
-only under linux (though BSD support would probably be feasable).
+only under linux and macOS (though BSD support would probably be feasable).
 
 ### compiling
 
-Configure QEMU for irix/solaris userland emulation and compile (see the original
+Configure QEMU for irix/solaris userland emulation for linux and compile (see the original
 QEMU README for further instructions):
 
 ```
 configure --target-list=irix-linux-user,irixn32-linux-user,irix64-linux-user,solaris-linux-user
 make && make install
+```
+
+Or, configure QEMU for irix userland emulatin for macOS
+
+```
+./configure --target-list=irix-darwin-user \
+    --disable-vnc \
+    --disable-sdl \
+    --disable-gtk \
+    --disable-cocoa \
+    --disable-opengl \
+    --disable-capstone \
+    --disable-hax \
+    --disable-hvf \
+    --disable-tools
+make
 ```
 
 ### using
