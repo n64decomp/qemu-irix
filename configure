@@ -5138,6 +5138,20 @@ if compile_prog "" "" ; then
 fi
 
 ##########################################
+# check if sys/mount.h conflicts with linux/fs.h
+
+have_sysmount_fs=no
+cat > $TMPC << EOF
+#include <sys/mount.h>
+int main(void) {
+  return FSCONFIG_SET_FLAG;
+}
+EOF
+if compile_prog "" "" ; then
+    have_sysmount_fs=yes
+fi
+
+##########################################
 # check if rtnetlink.h exists and is useful
 have_rtnetlink=no
 cat > $TMPC << EOF
@@ -6499,6 +6513,10 @@ echo "CONFIG_TRACE_FILE=$trace_file" >> $config_host_mak
 if test "$rdma" = "yes" ; then
   echo "CONFIG_RDMA=y" >> $config_host_mak
   echo "RDMA_LIBS=$rdma_libs" >> $config_host_mak
+fi
+
+if test "$have_sysmount_fs" = "yes" ; then
+  echo "CONFIG_SYS_MOUNT_FS=y" >> $config_host_mak
 fi
 
 if test "$have_rtnetlink" = "yes" ; then
