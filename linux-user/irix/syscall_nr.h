@@ -247,7 +247,7 @@
 #define TARGET_NR_syssgi_setsid		(20)
 #define TARGET_NR_syssgi_setpgid	(21)
 #define TARGET_NR_syssgi_sysconf	(22)
-#define TARGET_NR_syssgi_pathconf	(23)
+#define TARGET_NR_syssgi_pathconf	(24)
 #define TARGET_NR_syssgi_setgroups	(40)
 #define TARGET_NR_syssgi_getgroups	(41)
 #define TARGET_NR_syssgi_settimeofday	(52)

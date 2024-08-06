@@ -14527,13 +14527,13 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
             }
             break;
         case TARGET_NR_syssgi_pathconf:
-            if (arg3 == 1) {
-                if (!(p = lock_user_string(arg1)))
+            if (arg4 == 1) {
+                if (!(p = lock_user_string(arg2)))
                     goto efault;
-                ret = get_errno(pathconf(path(p), target_to_host_pathconf(arg2)));
+                ret = get_errno(pathconf(path(p), target_to_host_pathconf(arg3)));
                 unlock_user(p, arg1, 0);
             } else
-                ret = get_errno(fpathconf(arg1, target_to_host_pathconf(arg2)));
+                ret = get_errno(fpathconf(arg2, target_to_host_pathconf(arg3)));
             break;
         case TARGET_NR_syssgi_rusage:
             {
