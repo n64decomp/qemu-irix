@@ -800,9 +800,7 @@ int do_sigaction(CPUArchState *env, int sig, const struct target_sigaction *act,
     if (oact) {
         __put_user(k->_sa_handler, &oact->_sa_handler);
         __put_user(k->sa_flags, &oact->sa_flags);
-#ifdef TARGET_ARCH_HAS_SA_RESTORER
         __put_user(k->sa_restorer, &oact->sa_restorer);
-#endif
         /* Not swapped.  */
         oact->sa_mask = k->sa_mask;
     }
@@ -810,9 +808,7 @@ int do_sigaction(CPUArchState *env, int sig, const struct target_sigaction *act,
         /* FIXME: This is not threadsafe.  */
         __get_user(k->_sa_handler, &act->_sa_handler);
         __get_user(k->sa_flags, &act->sa_flags);
-#ifdef TARGET_ARCH_HAS_SA_RESTORER
         __get_user(k->sa_restorer, &act->sa_restorer);
-#endif
         /* To be swapped in target_to_host_sigset.  */
         k->sa_mask = act->sa_mask;
 

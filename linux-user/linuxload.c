@@ -1,10 +1,13 @@
 /* Code for loading Linux executables.  Mostly linux kernel code.  */
 
 #include "qemu/osdep.h"
-
 #include "qemu.h"
+#include "irix/ecoff_lib/ecoff.h"
+#include "ecoffload.h"
 
 #define NGROUPS 32
+
+bool gIsEcoffBinary = false;
 
 /* ??? This should really be somewhere else.  */
 abi_long memcpy_to_target(abi_ulong dest, const void *src,
@@ -20,41 +23,46 @@ abi_long memcpy_to_target(abi_ulong dest, const void *src,
     return 0;
 }
 
-static int count(char ** vec)
+static int count(char **vec)
 {
-    int		i;
+    int i;
 
-    for(i = 0; *vec; i++) {
+    for (i = 0; *vec; i++)
+    {
         vec++;
     }
 
-    return(i);
+    return (i);
 }
 
 static int prepare_binprm(struct linux_binprm *bprm)
 {
-    struct stat		st;
+    struct stat st;
     int mode;
     int retval;
 
-    if(fstat(bprm->fd, &st) < 0) {
-	return(-errno);
+    if (fstat(bprm->fd, &st) < 0)
+    {
+        return (-errno);
     }
 
     mode = st.st_mode;
-    if(!S_ISREG(mode)) {	/* Must be regular file */
-	return(-EACCES);
+    if (!S_ISREG(mode))
+    { /* Must be regular file */
+        return (-EACCES);
     }
-    if(!(mode & 0111)) {	/* Must have at least one execute bit set */
-	return(-EACCES);
+    if (!(mode & 0111))
+    { /* Must have at least one execute bit set */
+        return (-EACCES);
     }
 
     bprm->e_uid = geteuid();
     bprm->e_gid = getegid();
 
     /* Set-uid? */
-    if(mode & S_ISUID) {
-    	bprm->e_uid = st.st_uid;
+    if (mode & S_ISUID)
+    {
+        bprm->e_uid = st.st_uid;
     }
 
     /* Set-gid? */
@@ -63,16 +71,19 @@ static int prepare_binprm(struct linux_binprm *bprm)
      * is a candidate for mandatory locking, not a setgid
      * executable.
      */
-    if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) {
-	bprm->e_gid = st.st_gid;
+    if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP))
+    {
+        bprm->e_gid = st.st_gid;
     }
 
     retval = read(bprm->fd, bprm->buf, BPRM_BUF_SIZE);
-    if (retval < 0) {
-	perror("prepare_binprm");
-	exit(-1);
+    if (retval < 0)
+    {
+        perror("prepare_binprm");
+        exit(-1);
     }
-    if (retval < BPRM_BUF_SIZE) {
+    if (retval < BPRM_BUF_SIZE)
+    {
         /* Make sure the rest of the loader won't read garbage.  */
         memset(bprm->buf + retval, 0, BPRM_BUF_SIZE - retval);
     }
@@ -92,7 +103,8 @@ abi_ulong loader_build_argptr(int envc, int argc, abi_ulong sp,
     envp = sp;
     sp -= (argc + 1) * n;
     argv = sp;
-    if (push_ptr) {
+    if (push_ptr)
+    {
         /* FIXME - handle put_user() failures */
         sp -= n;
         put_user_ual(envp, sp);
@@ -103,7 +115,8 @@ abi_ulong loader_build_argptr(int envc, int argc, abi_ulong sp,
     /* FIXME - handle put_user() failures */
     put_user_ual(argc, sp);
     ts->info->arg_start = stringp;
-    while (argc-- > 0) {
+    while (argc-- > 0)
+    {
         /* FIXME - handle put_user() failures */
         put_user_ual(stringp, argv);
         argv += n;
@@ -112,7 +125,8 @@ abi_ulong loader_build_argptr(int envc, int argc, abi_ulong sp,
     ts->info->arg_end = stringp;
     /* FIXME - handle put_user() failures */
     put_user_ual(0, argv);
-    while (envc-- > 0) {
+    while (envc-- > 0)
+    {
         /* FIXME - handle put_user() failures */
         put_user_ual(stringp, envp);
         envp += n;
@@ -124,9 +138,44 @@ abi_ulong loader_build_argptr(int envc, int argc, abi_ulong sp,
     return sp;
 }
 
+int load_elf(struct linux_binprm *bprm, struct image_info *infop) 
+{
+    return load_elf_binary(bprm, infop);
+}
+
+int load_ecoff(struct linux_binprm *bprm, struct image_info *infop)
+{
+    bool isStatic = false;
+
+    ecoff_init((uint8_t *)bprm->buf, BPRM_BUF_SIZE);
+
+    if (!ecoff_is_header_valid())
+    {
+        return -ENOEXEC;
+    }
+
+    ecoff_sections_header_read();
+
+    char *interpName = ecoff_get_interp_name();
+
+    if (interpName == NULL)
+    {
+        isStatic = true;
+    }
+    else if (interpName == NULL && !ecoff_has_lib_section())
+    {
+        printf("Ecoff file not supported yet \n");
+        return -ENOEXEC;
+    }
+
+    ecoff_destroy();
+
+    return load_ecoff_binary(bprm, infop, interpName, isStatic);
+}
+
 int loader_exec(int fdexec, const char *filename, char **argv, char **envp,
-             struct target_pt_regs * regs, struct image_info *infop,
-             struct linux_binprm *bprm)
+                struct target_pt_regs *regs, struct image_info *infop,
+                struct linux_binprm *bprm)
 {
     int retval;
 
@@ -139,29 +188,27 @@ int loader_exec(int fdexec, const char *filename, char **argv, char **envp,
 
     retval = prepare_binprm(bprm);
 
-    if(retval>=0) {
-        if (bprm->buf[0] == 0x7f
-                && bprm->buf[1] == 'E'
-                && bprm->buf[2] == 'L'
-                && bprm->buf[3] == 'F') {
-            retval = load_elf_binary(bprm, infop);
-#if defined(TARGET_HAS_BFLT)
-        } else if (bprm->buf[0] == 'b'
-                && bprm->buf[1] == 'F'
-                && bprm->buf[2] == 'L'
-                && bprm->buf[3] == 'T') {
-            retval = load_flt_binary(bprm, infop);
-#endif
-        } else {
-            return -ENOEXEC;
-        }
+    if (retval <= 0) 
+    {
+        return -ENOEXEC;
     }
 
-    if(retval>=0) {
+    if (bprm->buf[0] == 0x7f && bprm->buf[1] == 'E' && bprm->buf[2] == 'L' && bprm->buf[3] == 'F') 
+    {
+        retval = load_elf(bprm, infop);  
+    } 
+    else 
+    {
+        retval = load_ecoff(bprm, infop);
+        gIsEcoffBinary = true;
+    }
+
+    if (retval >= 0)
+    {
         /* success.  Initialize important registers */
         do_init_thread(regs, infop);
         return retval;
     }
 
-    return(retval);
+    return retval;
 }

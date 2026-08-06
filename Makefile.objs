@@ -245,6 +245,7 @@ trace-events-subdirs += target/s390x
 trace-events-subdirs += target/ppc
 trace-events-subdirs += qom
 trace-events-subdirs += linux-user
+trace-events-subdirs += darwin-user
 trace-events-subdirs += qapi
 trace-events-subdirs += accel/tcg
 trace-events-subdirs += accel/kvm

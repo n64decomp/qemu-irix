@@ -1,0 +1,27 @@
+name: Compiling QEMU IRIX on macOS 14
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: macos-14
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Update homebrew and its packages
+      run: brew update && brew upgrade
+
+    - name: Configure
+      run: ./configure --target-list=irix-darwin-user --disable-werror --disable-vnc --disable-sdl --disable-gtk --disable-cocoa --disable-opengl --disable-capstone --disable-hax --disable-hvf --disable-tools
+
+    - name: Build
+      run: make -j3
+
+    - name: Install and check
+      run: make install -j3

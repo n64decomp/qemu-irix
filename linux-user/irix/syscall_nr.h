@@ -11,6 +11,7 @@
 #define TARGET_NR_write		(4+TARGET_NR_Linux)
 #define TARGET_NR_open		(5+TARGET_NR_Linux)
 #define TARGET_NR_close		(6+TARGET_NR_Linux)
+#define TARGET_NR_wait		(7+TARGET_NR_Linux)
 #define TARGET_NR_creat		(8+TARGET_NR_Linux)
 #define TARGET_NR_link		(9+TARGET_NR_Linux)
 #define TARGET_NR_unlink	(10+TARGET_NR_Linux)
@@ -30,6 +31,7 @@
 #define TARGET_NR_stime		(25+TARGET_NR_Linux)
 #define TARGET_NR_ptrace	(26+TARGET_NR_Linux)
 #define TARGET_NR_alarm		(27+TARGET_NR_Linux)
+#define TARGET_NR_fstat		(28+TARGET_NR_Linux)
 #define TARGET_NR_pause		(29+TARGET_NR_Linux)
 #define TARGET_NR_utime		(30+TARGET_NR_Linux)
 #define TARGET_NR_access	(33+TARGET_NR_Linux)
@@ -47,6 +49,7 @@
 #define TARGET_NR_plock		(45+TARGET_NR_Linux)
 #define TARGET_NR_setgid	(46+TARGET_NR_Linux)
 #define TARGET_NR_getgid	(47+TARGET_NR_Linux)
+#define TARGET_NR_signal	(48+TARGET_NR_Linux)
 #define TARGET_NR_msgsys	(49+TARGET_NR_Linux)
 #define TARGET_NR_sysmips	(50+TARGET_NR_Linux)
 #define TARGET_NR_acct		(51+TARGET_NR_Linux)
@@ -247,7 +250,7 @@
 #define TARGET_NR_syssgi_setsid		(20)
 #define TARGET_NR_syssgi_setpgid	(21)
 #define TARGET_NR_syssgi_sysconf	(22)
-#define TARGET_NR_syssgi_pathconf	(23)
+#define TARGET_NR_syssgi_pathconf	(24)
 #define TARGET_NR_syssgi_setgroups	(40)
 #define TARGET_NR_syssgi_getgroups	(41)
 #define TARGET_NR_syssgi_settimeofday	(52)
@@ -267,6 +270,7 @@
 
 
 /* syssgi(sysconf, cmd, ...) */
+#define TARGET_NR_sysconf_argmax    (1)
 #define TARGET_NR_sysconf_childmax	(2)
 #define TARGET_NR_sysconf_clktick	(3)
 #define TARGET_NR_sysconf_openmax	(5)

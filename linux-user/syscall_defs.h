@@ -486,6 +486,8 @@ int do_sigaction(CPUArchState *env, int sig, const struct target_sigaction *act,
 #define TARGET_SA_RESTART      0x00000004
 #define TARGET_SA_NODEFER      0x00000010
 #define TARGET_SA_RESETHAND    0x00000002
+#define TARGET_SA_RESTORER	0x04000000	/* Only for O32 */
+
 #elif defined(TARGET_SPARC)
 #define TARGET_SA_NOCLDSTOP    8u
 #define TARGET_SA_NOCLDWAIT    0x100u
@@ -784,10 +786,10 @@ struct target_sigaction {
 	abi_ulong	_sa_handler;
 #endif
 	target_sigset_t	sa_mask;
-#ifdef TARGET_ARCH_HAS_SA_RESTORER
+//#ifdef TARGET_ARCH_HAS_SA_RESTORER
         /* ??? This is always present, but ignored unless O32.  */
         abi_ulong sa_restorer;
-#endif
+//#endif
 };
 #else
 struct target_old_sigaction {

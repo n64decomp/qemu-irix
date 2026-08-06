@@ -1,0 +1,27 @@
+name: Compiling on Ubuntu 24.04
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install required packages
+      run: sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install libglib2.0-dev libpixman-1-dev
+
+    - name: Configure
+      run: ./configure --target-list=irix-linux-user,irixn32-linux-user,irix64-linux-user,solaris-linux-user --disable-werror
+
+    - name: Build
+      run: make -j4
+
+    - name: Install and check
+      run: sudo make install -j4

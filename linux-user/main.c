@@ -48,6 +48,8 @@ static const char *cpu_model;
 unsigned long mmap_min_addr;
 unsigned long guest_base;
 int have_guest_base;
+#define TARGET_ABI_IRIX
+#define TARGET_MIPS
 
 #define EXCP_DUMP(env, fmt, ...)                                        \
 do {                                                                    \
@@ -4836,7 +4838,7 @@ int main(int argc, char **argv, char **envp)
 
     cpu_model = NULL;
 
-    srand(time(NULL));
+    srand(time(NULL)); // Set random seed
 
     qemu_add_opts(&qemu_trace_opts);
 
@@ -4869,9 +4871,16 @@ int main(int argc, char **argv, char **envp)
         }
     }
 
+    #ifdef TARGET_ABI_IRIX
+    
+    cpu_model = "24Kf";
+    //printf("CPU Model: %s\n", cpu_model);
+    #else
     if (cpu_model == NULL) {
         cpu_model = cpu_get_model(get_elf_eflags(execfd));
     }
+    #endif
+    
     tcg_exec_init(0);
     /* NOTE: we need to init the CPU at this stage to get
        qemu_host_page_size */

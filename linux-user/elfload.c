@@ -18,6 +18,8 @@
 #undef ELF_ARCH
 #endif
 
+extern int gGPValue;
+extern int gEntryPt;
 #define ELF_OSABI   ELFOSABI_SYSV
 
 /* from personality.h */
@@ -894,6 +896,11 @@ static void elf_core_copy_regs(target_elf_gregset_t *regs, const CPUPPCState *en
 
 #ifdef TARGET_MIPS
 
+#ifdef TARGET_ABI_IRIX
+extern int irix_emulate_prda;
+extern bool gIsEcoffBinary;
+#endif
+
 #define ELF_START_MMAP 0x80000000
 
 #ifdef TARGET_MIPS64
@@ -907,7 +914,16 @@ static inline void init_thread(struct target_pt_regs *regs,
                                struct image_info *infop)
 {
     regs->cp0_status = 2 << CP0St_KSU;
-    regs->cp0_epc = infop->entry;
+    if (gIsEcoffBinary) 
+    {
+        regs->cp0_epc = gEntryPt;
+        regs->regs[28] = gGPValue;
+    } 
+    else 
+    {
+        regs->cp0_epc = infop->entry;
+    }
+
     regs->regs[29] = infop->start_stack;
 }
 
@@ -2351,14 +2367,16 @@ static void load_elf_image(const char *image_name, int image_fd,
     close(image_fd);
 #ifdef TARGET_ABI_IRIX
     /* PRDA hack */
-    error = target_mmap(0x200000, TARGET_PAGE_SIZE, PROT_READ | PROT_WRITE,
-                        MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS,
-                        -1, 0);
-    if (error == -1) {
-        goto exit_perror;
+    if (irix_emulate_prda) {
+        error = target_mmap(0x200000, TARGET_PAGE_SIZE, PROT_READ | PROT_WRITE,
+                            MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS,
+                            -1, 0);
+        if (error == -1) {
+            goto exit_perror;
+        }
+        put_user(getpid(), 0x200e00, target_pid_t);
+        put_user(getpid(), 0x200e40, target_pid_t);
     }
-    put_user(getpid(), 0x200e00, target_pid_t);
-    put_user(getpid(), 0x200e40, target_pid_t);
 #endif
     return;
 

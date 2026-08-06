@@ -18,12 +18,12 @@
  *
  */
 
-#include "qemu/osdep.h"
-#include "qapi/error.h"
-#include "crypto/hash.h"
-#include "hashpriv.h"
-#include <nettle/md5.h>
-#include <nettle/sha.h>
+#include "qemu/osdep.h" 
+#include "qapi/error.h" 
+#include "crypto/hash.h" 
+#include "hashpriv.h" 
+#include <nettle/md5.h> 
+#include <nettle/sha.h> 
 #include <nettle/ripemd160.h>
 
 typedef void (*qcrypto_nettle_init)(void *ctx);

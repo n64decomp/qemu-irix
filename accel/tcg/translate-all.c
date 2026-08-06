@@ -430,7 +430,8 @@ static void page_init(void)
 #else
         FILE *f;
 
-        last_brk = (unsigned long)sbrk(0);
+        // depreciated in osx, but value is not used?
+        //last_brk = (unsigned long)sbrk(0);
 
         f = fopen("/compat/linux/proc/self/maps", "r");
         if (f) {
@@ -602,8 +603,27 @@ static inline void *split_cross_256mb(void *buf1, size_t size1)
     return buf1;
 }
 #endif
-
 #ifdef USE_STATIC_CODE_GEN_BUFFER
+#if defined(CONFIG_DARWIN_USER)
+static inline void *alloc_code_gen_buffer(void)
+{
+    int prot = PROT_WRITE | PROT_READ | PROT_EXEC;
+    int flags = MAP_PRIVATE | MAP_ANON;
+    /* let a kernel pick an address close to the executable */
+    uintptr_t start = 0;
+    /* Honor a command-line option limiting the size of the buffer.  */
+    size_t size = DEFAULT_CODE_GEN_BUFFER_SIZE;
+    void *buf;
+
+    buf = mmap((void *)start, size, prot, flags, -1, 0);
+    if (buf == MAP_FAILED) {
+        return NULL;
+    }
+
+    qemu_madvise(buf, size, QEMU_MADV_HUGEPAGE);
+    return buf;
+}
+#else /* !CONFIG_DARWIN_USER */
 static uint8_t static_code_gen_buffer[DEFAULT_CODE_GEN_BUFFER_SIZE]
     __attribute__((aligned(CODE_GEN_ALIGN)));
 
@@ -640,6 +660,8 @@ static inline void *alloc_code_gen_buffer(void)
 
     return buf;
 }
+#endif /* CONFIG_DARWIN_USER */
+
 #elif defined(_WIN32)
 static inline void *alloc_code_gen_buffer(void)
 {

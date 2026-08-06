@@ -244,6 +244,11 @@ int cpu_signal_handler(int host_signum, void *pinfo,
 #define TRAP_sig(context)     ((context)->sc_trapno)
 #define ERROR_sig(context)    ((context)->sc_err)
 #define MASK_sig(context)     ((context)->sc_mask)
+#elif defined(__APPLE__)
+#define PC_sig(context)       ((context)->uc_mcontext->__ss.__rip)
+#define TRAP_sig(context)     ((context)->uc_mcontext->__es.__trapno)
+#define ERROR_sig(context)    ((context)->uc_mcontext->__es.__err)
+#define MASK_sig(context)     ((context)->uc_sigmask)
 #elif defined(__FreeBSD__) || defined(__DragonFly__)
 #include <ucontext.h>
 

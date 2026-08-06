@@ -1,1 +1,1 @@
-# Default configuration for mips64-linux-user
+# Default configuration for irix64-linux-user
